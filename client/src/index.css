@@ -10,4 +10,38 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+
+  /* FullCalendar custom styles */
+  .fc-event-overdue {
+    @apply bg-yellow-600 border-yellow-700 hover:bg-yellow-500;
+  }
+
+  .fc-event-today {
+    @apply bg-orange-500 border-orange-600 hover:bg-orange-400;
+  }
+
+  .fc-event-upcoming {
+    @apply bg-primary border-primary-darker hover:opacity-90;
+  }
+
+  .fc .fc-button-primary {
+    @apply bg-primary border-primary-darker hover:bg-primary/90;
+  }
+
+  .fc .fc-button-primary:not(:disabled).fc-button-active,
+  .fc .fc-button-primary:not(:disabled):active {
+    @apply bg-primary-darker border-primary-darker;
+  }
+
+  .fc .fc-daygrid-day.fc-day-today {
+    @apply bg-primary/10;
+  }
+
+  .fc-event {
+    @apply cursor-pointer;
+  }
+
+  .fc-event-title {
+    @apply font-medium;
+  }
 }
