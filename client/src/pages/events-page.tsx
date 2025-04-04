@@ -183,7 +183,7 @@ export default function EventsPage() {
               <div className="px-4 py-6 text-center text-gray-500">
                 <p>{upcomingSelected ? "No upcoming events scheduled." : "No past events found."}</p>
                 <Button variant="link" className="mt-2">
-                  <Link href="/contacts">Schedule a meetup with a contact</Link>
+                  <Link href="/events/new">Create New Event</Link>
                 </Button>
               </div>
             )}

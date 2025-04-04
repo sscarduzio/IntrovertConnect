@@ -12,6 +12,7 @@ import RemindersPage from "@/pages/reminders-page";
 import TagsPage from "@/pages/tags-page";
 import EventsPage from "@/pages/events-page";
 import EventDetailPage from "@/pages/event-detail-page";
+import EventCreatePage from "@/pages/event-create-page";
 
 function Router() {
   return (
@@ -21,6 +22,7 @@ function Router() {
       <ProtectedRoute path="/reminders" component={RemindersPage} />
       <ProtectedRoute path="/tags" component={TagsPage} />
       <ProtectedRoute path="/events" component={EventsPage} />
+      <ProtectedRoute path="/events/new" component={EventCreatePage} />
       <ProtectedRoute path="/events/:id" component={EventDetailPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />

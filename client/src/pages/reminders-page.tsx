@@ -200,26 +200,6 @@ export default function RemindersPage() {
           <div className="pb-5 border-b border-gray-200 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h1 className="text-2xl font-semibold text-gray-900">Follow-up Reminders</h1>
             <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
-              {/* View Toggle */}
-              <TabsList className="grid grid-cols-2 w-[200px]">
-                <TabsTrigger 
-                  value="list" 
-                  onClick={() => setViewMode("list")}
-                  className={viewMode === "list" ? "data-[state=active]:bg-primary data-[state=active]:text-white" : ""}
-                >
-                  <ListIcon className="h-4 w-4 mr-2" />
-                  List
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="calendar" 
-                  onClick={() => setViewMode("calendar")}
-                  className={viewMode === "calendar" ? "data-[state=active]:bg-primary data-[state=active]:text-white" : ""}
-                >
-                  <CalendarIcon className="h-4 w-4 mr-2" />
-                  Calendar
-                </TabsTrigger>
-              </TabsList>
-              
               {/* Filter */}
               <div className="flex items-center">
                 <Filter className="mr-2 h-4 w-4 text-gray-500" />
@@ -240,7 +220,18 @@ export default function RemindersPage() {
           </div>
 
           {/* Content */}
-          <Tabs value={viewMode} className="w-full">
+          <Tabs value={viewMode} onValueChange={setViewMode} className="w-full">
+            {/* View Toggle */}
+            <TabsList className="grid grid-cols-2 w-[200px] mb-4">
+              <TabsTrigger value="list">
+                <ListIcon className="h-4 w-4 mr-2" />
+                List
+              </TabsTrigger>
+              <TabsTrigger value="calendar">
+                <CalendarIcon className="h-4 w-4 mr-2" />
+                Calendar
+              </TabsTrigger>
+            </TabsList>
             {/* List View */}
             <TabsContent value="list" className="mt-0">
               {filteredContacts.length > 0 ? (
