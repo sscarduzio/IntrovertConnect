@@ -74,6 +74,13 @@ export const insertContactLogSchema = createInsertSchema(contactLogs).omit({
   id: true,
   createdAt: true,
 }).extend({
+  // Override the contactDate field to accept string
+  contactDate: z.union([z.string(), z.date()]).transform(val => {
+    if (typeof val === 'string') {
+      return new Date(val);
+    }
+    return val;
+  }),
   reminderFrequency: z.number().optional(),
 });
 
