@@ -326,14 +326,23 @@ export class MemStorage implements IStorage {
     // Update the contact's last contact date
     const contact = this.contacts.get(contactLogData.contactId);
     if (contact) {
+      // Determine which reminder frequency to use (provided or default)
+      const reminderFrequency = contactLogData.reminderFrequency !== undefined 
+        ? contactLogData.reminderFrequency 
+        : contact.reminderFrequency;
+      
       // Calculate the next contact date based on the reminder frequency
       const nextContactDate = new Date(contactLogData.contactDate);
-      nextContactDate.setMonth(nextContactDate.getMonth() + contact.reminderFrequency);
+      nextContactDate.setMonth(nextContactDate.getMonth() + reminderFrequency);
       
       const updatedContact: Contact = {
         ...contact,
         lastContactDate: contactLogData.contactDate,
         nextContactDate: nextContactDate,
+        // Update the contact's reminder frequency if a new one was provided
+        reminderFrequency: contactLogData.reminderFrequency !== undefined 
+          ? reminderFrequency 
+          : contact.reminderFrequency,
         updatedAt: now,
       };
       

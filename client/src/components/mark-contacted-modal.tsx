@@ -47,10 +47,14 @@ export function MarkContactedModal({
 
   const logContactMutation = useMutation({
     mutationFn: async (data: ContactLogFormValues) => {
+      // Process reminder frequency
+      let reminderFrequency = data.nextReminderFrequency;
+      
       const contactLogData = {
-        contactDate: new Date(data.contactDate),
+        contactDate: data.contactDate,  // Send as string, not Date object
         contactType: data.contactType,
         notes: data.notes,
+        reminderFrequency: reminderFrequency === "default" ? contact.reminderFrequency : parseInt(reminderFrequency),
       };
       
       const res = await apiRequest("POST", `/api/contacts/${contact.id}/logs`, contactLogData);

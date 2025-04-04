@@ -73,6 +73,8 @@ export const insertContactTagSchema = createInsertSchema(contactTags).pick({
 export const insertContactLogSchema = createInsertSchema(contactLogs).omit({
   id: true,
   createdAt: true,
+}).extend({
+  reminderFrequency: z.number().optional(),
 });
 
 // Response types for API
