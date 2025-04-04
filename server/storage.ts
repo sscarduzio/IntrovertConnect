@@ -135,6 +135,11 @@ export class MemStorage implements IStorage {
     const contactDataWithoutTags = { ...contactData };
     delete contactDataWithoutTags.tags;
     
+    // Calculate next contact date based on reminder frequency
+    const reminderFrequency = contactData.reminderFrequency || 3; // Default is 3 months if not specified
+    const nextContactDate = new Date(now);
+    nextContactDate.setMonth(nextContactDate.getMonth() + reminderFrequency);
+    
     const contact: Contact = {
       ...contactDataWithoutTags,
       id,
@@ -142,7 +147,8 @@ export class MemStorage implements IStorage {
       phone: contactData.phone || null,
       notes: contactData.notes || null,
       lastContactDate: contactData.lastContactDate || null,
-      nextContactDate: contactData.nextContactDate || null,
+      // Set the next contact date automatically
+      nextContactDate: contactData.nextContactDate || nextContactDate,
       createdAt: now,
       updatedAt: now,
     };
@@ -223,6 +229,12 @@ export class MemStorage implements IStorage {
     
     // Delete all related contact-tag associations
     await this.deleteContactTagsByContactId(id);
+    
+    // Delete all contact logs associated with this contact
+    const contactLogs = await this.getContactLogsByContactId(id);
+    for (const log of contactLogs) {
+      this.contactLogs.delete(log.id);
+    }
     
     // Delete the contact
     this.contacts.delete(id);
