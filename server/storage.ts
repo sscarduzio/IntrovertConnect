@@ -521,11 +521,11 @@ export class MemStorage implements IStorage {
     const userContacts = Array.from(this.contacts.values()).filter(
       (contact) => 
         contact.userId === userId && 
-        contact.nextContactDate !== null && 
-        contact.nextContactDate <= now
+        contact.nextContactDate !== null
+        // Note: removed the "nextContactDate <= now" condition to show all future reminders
     );
     
-    // Sort by how overdue they are (most overdue first)
+    // Sort by date (upcoming first, then overdue)
     userContacts.sort((a, b) => {
       if (!a.nextContactDate || !b.nextContactDate) return 0;
       return a.nextContactDate.getTime() - b.nextContactDate.getTime();

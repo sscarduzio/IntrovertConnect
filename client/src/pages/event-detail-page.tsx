@@ -113,27 +113,36 @@ export default function EventDetailPage() {
   }
 
   // Format dates
-  const startDate = new Date(event.startDate);
-  const endDate = new Date(event.endDate);
+  // Make sure we have valid dates before formatting
+  const startDateStr = event.startDate?.toString();
+  const endDateStr = event.endDate?.toString();
   
-  const formattedDate = new Intl.DateTimeFormat('en-US', {
+  // Create dates only if we have valid strings
+  const startDate = startDateStr ? new Date(startDateStr) : new Date();
+  const endDate = endDateStr ? new Date(endDateStr) : new Date();
+  
+  // Check if the dates are valid before formatting
+  const isStartDateValid = !isNaN(startDate.getTime());
+  const isEndDateValid = !isNaN(endDate.getTime());
+  
+  const formattedDate = isStartDateValid ? new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
     month: 'long', 
     day: 'numeric',
     year: 'numeric'
-  }).format(startDate);
+  }).format(startDate) : "Invalid date";
   
-  const formattedStartTime = new Intl.DateTimeFormat('en-US', {
+  const formattedStartTime = isStartDateValid ? new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true
-  }).format(startDate);
+  }).format(startDate) : "Invalid time";
   
-  const formattedEndTime = new Intl.DateTimeFormat('en-US', {
+  const formattedEndTime = isEndDateValid ? new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true
-  }).format(endDate);
+  }).format(endDate) : "Invalid time";
 
   // Calculate status
   const now = new Date();

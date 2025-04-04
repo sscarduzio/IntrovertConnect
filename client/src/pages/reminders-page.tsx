@@ -157,7 +157,8 @@ export default function RemindersPage() {
         });
       case "all":
       default:
-        return contacts;
+        // Return all contacts with a nextContactDate
+        return contacts.filter(c => c.nextContactDate !== null);
     }
   };
   
