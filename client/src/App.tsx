@@ -10,6 +10,8 @@ import DashboardPage from "@/pages/dashboard-page";
 import ContactsPage from "@/pages/contacts-page";
 import RemindersPage from "@/pages/reminders-page";
 import TagsPage from "@/pages/tags-page";
+import EventsPage from "@/pages/events-page";
+import EventDetailPage from "@/pages/event-detail-page";
 
 function Router() {
   return (
@@ -18,6 +20,8 @@ function Router() {
       <ProtectedRoute path="/contacts" component={ContactsPage} />
       <ProtectedRoute path="/reminders" component={RemindersPage} />
       <ProtectedRoute path="/tags" component={TagsPage} />
+      <ProtectedRoute path="/events" component={EventsPage} />
+      <ProtectedRoute path="/events/:id" component={EventDetailPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>

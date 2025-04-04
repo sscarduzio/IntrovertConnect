@@ -10,7 +10,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -39,6 +40,7 @@ export default function Navbar() {
     { href: "/", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
     { href: "/contacts", label: "Contacts", icon: <Users className="h-5 w-5" /> },
     { href: "/reminders", label: "Reminders", icon: <Bell className="h-5 w-5" /> },
+    { href: "/events", label: "Events", icon: <Calendar className="h-5 w-5" /> },
     { href: "/tags", label: "Tags", icon: <Tag className="h-5 w-5" /> },
   ];
 

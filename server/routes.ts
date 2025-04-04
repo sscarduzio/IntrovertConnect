@@ -7,7 +7,8 @@ import { z } from "zod";
 import { 
   insertContactSchema, 
   insertTagSchema, 
-  insertContactLogSchema
+  insertContactLogSchema,
+  insertCalendarEventSchema
 } from "@shared/schema";
 
 // Middleware to ensure user is authenticated
@@ -207,6 +208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dueContacts = await storage.getDueContacts(req.user!.id);
       const recentContacts = await storage.getRecentContacts(req.user!.id, 5);
       const popularTags = await storage.getPopularTags(req.user!.id, 10);
+      const upcomingEvents = await storage.getUpcomingEvents(req.user!.id, 5);
       
       const allContacts = await storage.getContactsByUserId(req.user!.id);
       
@@ -220,6 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         dueContacts,
         recentContacts,
+        upcomingEvents,
         popularTags: popularTags.map(item => ({ 
           id: item.tag.id,
           name: item.tag.name, 
@@ -240,6 +243,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({ message: "Reminders processed successfully" });
     } catch (error) {
       res.status(500).json({ message: "Error processing reminders", error });
+    }
+  });
+
+  // Calendar Events routes
+  app.get("/api/events", ensureAuthenticated, async (req, res) => {
+    try {
+      const events = await storage.getCalendarEventsByUserId(req.user!.id);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching events", error });
+    }
+  });
+
+  app.get("/api/events/upcoming", ensureAuthenticated, async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const events = await storage.getUpcomingEvents(req.user!.id, limit);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching upcoming events", error });
+    }
+  });
+
+  app.get("/api/contacts/:id/events", ensureAuthenticated, async (req, res) => {
+    try {
+      const contactId = parseInt(req.params.id);
+      
+      // Check if contact exists and belongs to user
+      const existingContact = await storage.getContactById(contactId);
+      if (!existingContact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      
+      if (existingContact.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const events = await storage.getCalendarEventsByContactId(contactId);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching contact events", error });
+    }
+  });
+
+  app.get("/api/events/:id", ensureAuthenticated, async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const event = await storage.getCalendarEvent(eventId);
+      
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Check if event belongs to current user
+      if (event.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      res.json(event);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching event", error });
+    }
+  });
+
+  app.post("/api/events", ensureAuthenticated, async (req, res) => {
+    try {
+      const validated = insertCalendarEventSchema.parse({
+        ...req.body,
+        userId: req.user!.id
+      });
+      
+      // Check if contact exists and belongs to user
+      const existingContact = await storage.getContactById(validated.contactId);
+      if (!existingContact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      
+      if (existingContact.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const event = await storage.createCalendarEvent(validated);
+      res.status(201).json(event);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid event data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Error creating event", error });
+    }
+  });
+
+  app.patch("/api/events/:id", ensureAuthenticated, async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      
+      // Check if event exists and belongs to user
+      const existingEvent = await storage.getCalendarEvent(eventId);
+      if (!existingEvent) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      if (existingEvent.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const validated = insertCalendarEventSchema.partial().parse(req.body);
+      
+      // If contactId is being updated, check if the new contact exists and belongs to user
+      if (validated.contactId && validated.contactId !== existingEvent.contactId) {
+        const existingContact = await storage.getContactById(validated.contactId);
+        if (!existingContact) {
+          return res.status(404).json({ message: "Contact not found" });
+        }
+        
+        if (existingContact.userId !== req.user!.id) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+      }
+      
+      const updatedEvent = await storage.updateCalendarEvent(eventId, validated);
+      res.json(updatedEvent);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid event data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Error updating event", error });
+    }
+  });
+
+  app.delete("/api/events/:id", ensureAuthenticated, async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      
+      // Check if event exists and belongs to user
+      const existingEvent = await storage.getCalendarEvent(eventId);
+      if (!existingEvent) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      if (existingEvent.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      await storage.deleteCalendarEvent(eventId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Error deleting event", error });
     }
   });
 

@@ -1,4 +1,4 @@
-import { User, InsertUser, Contact, InsertContact, Tag, InsertTag, ContactTag, InsertContactTag, ContactLog, InsertContactLog, ContactWithTags, ContactWithLogsAndTags } from "@shared/schema";
+import { User, InsertUser, Contact, InsertContact, Tag, InsertTag, ContactTag, InsertContactTag, ContactLog, InsertContactLog, ContactWithTags, ContactWithLogsAndTags, CalendarEvent, InsertCalendarEvent } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 
@@ -34,13 +34,22 @@ export interface IStorage {
   getContactLogsByContactId(contactId: number): Promise<ContactLog[]>;
   createContactLog(contactLog: InsertContactLog): Promise<ContactLog>;
   
+  // Calendar Event methods
+  getCalendarEventsByUserId(userId: number): Promise<CalendarEvent[]>;
+  getCalendarEventsByContactId(contactId: number): Promise<CalendarEvent[]>;
+  getCalendarEvent(id: number): Promise<CalendarEvent | undefined>;
+  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
+  updateCalendarEvent(id: number, event: Partial<InsertCalendarEvent>): Promise<CalendarEvent | undefined>;
+  deleteCalendarEvent(id: number): Promise<boolean>;
+  
   // Dashboard data
   getDueContacts(userId: number): Promise<ContactWithTags[]>;
   getRecentContacts(userId: number, limit: number): Promise<ContactWithTags[]>;
   getPopularTags(userId: number, limit: number): Promise<{tag: Tag, count: number}[]>;
+  getUpcomingEvents(userId: number, limit: number): Promise<CalendarEvent[]>;
   
   // Session store for auth
-  sessionStore: session.SessionStore;
+  sessionStore: any;
 }
 
 export class MemStorage implements IStorage {
@@ -49,13 +58,15 @@ export class MemStorage implements IStorage {
   private tags: Map<number, Tag>;
   private contactTags: Map<number, ContactTag>;
   private contactLogs: Map<number, ContactLog>;
-  sessionStore: session.SessionStore;
+  private calendarEvents: Map<number, CalendarEvent>;
+  sessionStore: any;
   
   private userIdCounter: number;
   private contactIdCounter: number;
   private tagIdCounter: number;
   private contactTagIdCounter: number;
   private contactLogIdCounter: number;
+  private calendarEventIdCounter: number;
 
   constructor() {
     this.users = new Map();
@@ -63,12 +74,14 @@ export class MemStorage implements IStorage {
     this.tags = new Map();
     this.contactTags = new Map();
     this.contactLogs = new Map();
+    this.calendarEvents = new Map();
     
     this.userIdCounter = 1;
     this.contactIdCounter = 1;
     this.tagIdCounter = 1;
     this.contactTagIdCounter = 1;
     this.contactLogIdCounter = 1;
+    this.calendarEventIdCounter = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // 24 hours
@@ -149,6 +162,11 @@ export class MemStorage implements IStorage {
       lastContactDate: contactData.lastContactDate || null,
       // Set the next contact date automatically
       nextContactDate: contactData.nextContactDate || nextContactDate,
+      // Initial relationship metrics
+      relationshipScore: 50, // Default starting score
+      contactFrequency: 0,   // No contacts recorded yet
+      contactTrend: "stable", // Default to stable
+      lastResponseDate: null, // No responses yet
       createdAt: now,
       updatedAt: now,
     };
@@ -234,6 +252,12 @@ export class MemStorage implements IStorage {
     const contactLogs = await this.getContactLogsByContactId(id);
     for (const log of contactLogs) {
       this.contactLogs.delete(log.id);
+    }
+    
+    // Delete all calendar events associated with this contact
+    const calendarEvents = await this.getCalendarEventsByContactId(id);
+    for (const event of calendarEvents) {
+      this.calendarEvents.delete(event.id);
     }
     
     // Delete the contact
@@ -335,7 +359,7 @@ export class MemStorage implements IStorage {
     
     this.contactLogs.set(id, contactLog);
     
-    // Update the contact's last contact date
+    // Update the contact's metrics
     const contact = this.contacts.get(contactLogData.contactId);
     if (contact) {
       // Determine which reminder frequency to use (provided or default)
@@ -347,6 +371,15 @@ export class MemStorage implements IStorage {
       const nextContactDate = new Date(contactLogData.contactDate);
       nextContactDate.setMonth(nextContactDate.getMonth() + reminderFrequency);
       
+      // Calculate updated relationship metrics
+      const updatedMetrics = await this.calculateRelationshipMetrics(contact.id);
+      
+      // If this log indicates a response, update the last response date
+      let lastResponseDate = contact.lastResponseDate;
+      if (contactLogData.gotResponse) {
+        lastResponseDate = contactLogData.responseDate || now;
+      }
+      
       const updatedContact: Contact = {
         ...contact,
         lastContactDate: contactLogData.contactDate,
@@ -355,6 +388,11 @@ export class MemStorage implements IStorage {
         reminderFrequency: contactLogData.reminderFrequency !== undefined 
           ? reminderFrequency 
           : contact.reminderFrequency,
+        // Update relationship metrics
+        relationshipScore: updatedMetrics.relationshipScore,
+        contactFrequency: updatedMetrics.contactFrequency,
+        contactTrend: updatedMetrics.contactTrend,
+        lastResponseDate,
         updatedAt: now,
       };
       
@@ -362,6 +400,109 @@ export class MemStorage implements IStorage {
     }
     
     return contactLog;
+  }
+  
+  // Calculates relationship health metrics for a contact
+  private async calculateRelationshipMetrics(contactId: number): Promise<{ 
+    relationshipScore: number; 
+    contactFrequency: number; 
+    contactTrend: string;
+  }> {
+    // Get all logs for this contact
+    const logs = await this.getContactLogsByContactId(contactId);
+    
+    // Calculate metrics based on logs
+    let relationshipScore = 50; // Default score
+    let contactTrend = "stable";
+    
+    // Calculate contact frequency (number of contacts in last 6 months)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const contactFrequency = logs.filter(log => 
+      log.contactDate >= sixMonthsAgo
+    ).length;
+    
+    // Calculate response rate (% of interactions where contact responded)
+    const totalInteractions = logs.length;
+    const responsesReceived = logs.filter(log => log.gotResponse).length;
+    
+    const responseRate = totalInteractions > 0 
+      ? (responsesReceived / totalInteractions) * 100
+      : 50; // Default to 50% if no interactions
+    
+    // Calculate recency score (higher if recent interactions)
+    let recencyScore = 50;
+    if (logs.length > 0) {
+      const mostRecentLog = logs[0]; // Logs are sorted by date descending
+      const daysSinceLastContact = (Date.now() - mostRecentLog.contactDate.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (daysSinceLastContact < 7) {
+        recencyScore = 100;
+      } else if (daysSinceLastContact < 30) {
+        recencyScore = 80;
+      } else if (daysSinceLastContact < 90) {
+        recencyScore = 60;
+      } else if (daysSinceLastContact < 180) {
+        recencyScore = 40;
+      } else {
+        recencyScore = 20;
+      }
+    }
+    
+    // Calculate frequency score (higher if more frequent contact)
+    let frequencyScore = 50;
+    if (contactFrequency >= 12) {
+      frequencyScore = 100; // 2+ contacts per month
+    } else if (contactFrequency >= 6) {
+      frequencyScore = 80; // 1+ contact per month
+    } else if (contactFrequency >= 3) {
+      frequencyScore = 60; // 1 contact every 2 months
+    } else if (contactFrequency >= 1) {
+      frequencyScore = 40; // At least 1 contact in 6 months
+    } else {
+      frequencyScore = 20; // No contacts in 6 months
+    }
+    
+    // Combine scores with different weights
+    relationshipScore = Math.round(
+      (responseRate * 0.4) + 
+      (recencyScore * 0.3) + 
+      (frequencyScore * 0.3)
+    );
+    
+    // Ensure score is within 0-100 range
+    relationshipScore = Math.max(0, Math.min(100, relationshipScore));
+    
+    // Determine trend by comparing recent activity to previous period
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    
+    const sixToThreeMonthsAgo = new Date(sixMonthsAgo);
+    sixToThreeMonthsAgo.setMonth(sixToThreeMonthsAgo.getMonth() + 3);
+    
+    const recentPeriodCount = logs.filter(log => 
+      log.contactDate >= threeMonthsAgo
+    ).length;
+    
+    const previousPeriodCount = logs.filter(log => 
+      log.contactDate >= sixMonthsAgo && 
+      log.contactDate < threeMonthsAgo
+    ).length;
+    
+    if (recentPeriodCount > previousPeriodCount + 1) {
+      contactTrend = "improving";
+    } else if (recentPeriodCount < previousPeriodCount - 1) {
+      contactTrend = "declining";
+    } else {
+      contactTrend = "stable";
+    }
+    
+    return {
+      relationshipScore,
+      contactFrequency,
+      contactTrend
+    };
   }
 
   // Helper methods
@@ -422,6 +563,72 @@ export class MemStorage implements IStorage {
     // Sort by count in descending order and take the top 'limit'
     return tagCounts
       .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+  }
+
+  // Calendar Event methods
+  async getCalendarEventsByUserId(userId: number): Promise<CalendarEvent[]> {
+    return Array.from(this.calendarEvents.values())
+      .filter(event => event.userId === userId)
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  }
+  
+  async getCalendarEventsByContactId(contactId: number): Promise<CalendarEvent[]> {
+    return Array.from(this.calendarEvents.values())
+      .filter(event => event.contactId === contactId)
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  }
+  
+  async getCalendarEvent(id: number): Promise<CalendarEvent | undefined> {
+    return this.calendarEvents.get(id);
+  }
+  
+  async createCalendarEvent(eventData: InsertCalendarEvent): Promise<CalendarEvent> {
+    const id = this.calendarEventIdCounter++;
+    const now = new Date();
+    
+    const calendarEvent: CalendarEvent = {
+      ...eventData,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    this.calendarEvents.set(id, calendarEvent);
+    return calendarEvent;
+  }
+  
+  async updateCalendarEvent(id: number, eventData: Partial<InsertCalendarEvent>): Promise<CalendarEvent | undefined> {
+    const existingEvent = this.calendarEvents.get(id);
+    if (!existingEvent) return undefined;
+    
+    const updatedEvent: CalendarEvent = {
+      ...existingEvent,
+      ...eventData,
+      updatedAt: new Date(),
+    };
+    
+    this.calendarEvents.set(id, updatedEvent);
+    return updatedEvent;
+  }
+  
+  async deleteCalendarEvent(id: number): Promise<boolean> {
+    const exists = this.calendarEvents.has(id);
+    if (!exists) return false;
+    
+    this.calendarEvents.delete(id);
+    return true;
+  }
+  
+  async getUpcomingEvents(userId: number, limit: number): Promise<CalendarEvent[]> {
+    const now = new Date();
+    
+    return Array.from(this.calendarEvents.values())
+      .filter(event => 
+        event.userId === userId && 
+        event.startDate >= now
+      )
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
       .slice(0, limit);
   }
 }

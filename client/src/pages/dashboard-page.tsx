@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Loader2, AlertCircle, UserRound, PlusCircle } from "lucide-react";
+import { Loader2, AlertCircle, UserRound, PlusCircle, Calendar } from "lucide-react";
 import { AddContactModal } from "@/components/add-contact-modal";
 import { ContactDetailsModal } from "@/components/contact-details-modal";
 import { MarkContactedModal } from "@/components/mark-contacted-modal";
@@ -9,7 +9,7 @@ import Navbar from "@/components/navbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ContactWithTags, ContactWithLogsAndTags } from "@shared/schema";
+import { ContactWithTags, ContactWithLogsAndTags, CalendarEvent } from "@shared/schema";
 
 type DashboardData = {
   stats: {
@@ -19,6 +19,7 @@ type DashboardData = {
   };
   dueContacts: ContactWithTags[];
   recentContacts: ContactWithTags[];
+  upcomingEvents: CalendarEvent[];
   popularTags: { id: number; name: string; count: number }[];
 };
 
@@ -343,6 +344,72 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Upcoming Events Section */}
+          <div className="bg-white shadow overflow-hidden sm:rounded-md mb-6">
+            <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg leading-6 font-medium text-gray-900">Upcoming Events</h2>
+                <p className="mt-1 max-w-2xl text-sm text-gray-500">Your scheduled meetups and events</p>
+              </div>
+              <Link href="/events" className="text-sm text-primary font-medium flex items-center">
+                View all 
+                <svg className="ml-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </Link>
+            </div>
+            {data?.upcomingEvents && data.upcomingEvents.length > 0 ? (
+              <ul className="divide-y divide-gray-200">
+                {data.upcomingEvents.slice(0, 3).map((event) => {
+                  const eventDate = new Date(event.startDate);
+                  const formattedDate = new Intl.DateTimeFormat('en-US', {
+                    weekday: 'short',
+                    month: 'short', 
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                  }).format(eventDate);
+                  
+                  return (
+                    <li key={event.id}>
+                      <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-500 text-white flex items-center justify-center">
+                              <Calendar className="h-5 w-5" />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{event.title}</div>
+                              <div className="text-sm text-gray-500">
+                                {formattedDate} {event.location ? `• ${event.location}` : ''}
+                              </div>
+                              {event.description && (
+                                <div className="text-sm text-gray-500 mt-1 line-clamp-1">
+                                  {event.description}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <Link href={`/events/${event.id}`}>
+                              <Button variant="outline" size="sm">
+                                View Details
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="px-4 py-6 text-center text-gray-500">
+                <p>No upcoming events. Schedule a meetup with a contact!</p>
+              </div>
+            )}
           </div>
         </div>
       </main>

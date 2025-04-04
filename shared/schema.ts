@@ -21,6 +21,10 @@ export const contacts = pgTable("contacts", {
   lastContactDate: timestamp("last_contact_date"),
   nextContactDate: timestamp("next_contact_date"),
   reminderFrequency: integer("reminder_frequency").notNull().default(3), // months
+  relationshipScore: integer("relationship_score").default(50), // 0-100 scale
+  contactFrequency: integer("contact_frequency").default(0), // number of contacts in last 6 months
+  contactTrend: text("contact_trend").default("stable"), // "improving", "stable", "declining"
+  lastResponseDate: timestamp("last_response_date"), // when the contact last responded
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -44,7 +48,25 @@ export const contactLogs = pgTable("contact_logs", {
   contactDate: timestamp("contact_date").notNull(),
   contactType: text("contact_type").notNull(),
   notes: text("notes"),
+  gotResponse: boolean("got_response").default(false),
+  responseDate: timestamp("response_date"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const calendarEvents = pgTable("calendar_events", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  contactId: integer("contact_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  location: text("location"),
+  reminderMinutes: integer("reminder_minutes").default(30),
+  syncedWithExternal: boolean("synced_with_external").default(false),
+  externalEventId: text("external_event_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Insert Schemas
@@ -82,6 +104,13 @@ export const insertContactLogSchema = createInsertSchema(contactLogs).omit({
     return val;
   }),
   reminderFrequency: z.number().optional(),
+  gotResponse: z.boolean().default(false),
+  responseDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (typeof val === 'string') {
+      return new Date(val);
+    }
+    return val || null;
+  }),
 });
 
 // Response types for API
@@ -96,6 +125,10 @@ export type ContactWithTags = {
   lastContactDate: Date | null;
   nextContactDate: Date | null;
   reminderFrequency: number;
+  relationshipScore: number;
+  contactFrequency: number;
+  contactTrend: string;
+  lastResponseDate: Date | null;
   createdAt: Date;
   updatedAt: Date;
   tags: Tag[];
@@ -104,6 +137,24 @@ export type ContactWithTags = {
 export type ContactWithLogsAndTags = ContactWithTags & {
   logs: ContactLog[];
 };
+
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents)
+  .omit({ id: true, createdAt: true, updatedAt: true })
+  .extend({
+    // Override date fields to accept strings
+    startDate: z.union([z.string(), z.date()]).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val);
+      }
+      return val;
+    }),
+    endDate: z.union([z.string(), z.date()]).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val);
+      }
+      return val;
+    }),
+  });
 
 // Type definitions
 export type User = typeof users.$inferSelect;
@@ -116,3 +167,5 @@ export type ContactTag = typeof contactTags.$inferSelect;
 export type InsertContactTag = z.infer<typeof insertContactTagSchema>;
 export type ContactLog = typeof contactLogs.$inferSelect;
 export type InsertContactLog = z.infer<typeof insertContactLogSchema>;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;

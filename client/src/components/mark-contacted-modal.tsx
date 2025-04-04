@@ -24,6 +24,8 @@ const contactLogSchema = z.object({
   contactType: z.string(),
   notes: z.string().optional(),
   nextReminderFrequency: z.string(),
+  gotResponse: z.boolean().default(false),
+  responseDate: z.string().optional(),
 });
 
 type ContactLogFormValues = z.infer<typeof contactLogSchema>;
@@ -42,6 +44,8 @@ export function MarkContactedModal({
       contactType: "call",
       notes: "",
       nextReminderFrequency: "default",
+      gotResponse: false,
+      responseDate: "",
     },
   });
 
@@ -90,6 +94,8 @@ export function MarkContactedModal({
       contactType: "call",
       notes: "",
       nextReminderFrequency: "default",
+      gotResponse: false,
+      responseDate: "",
     });
     onClose();
   };
