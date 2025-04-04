@@ -8,6 +8,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Pencil, Trash2, CheckCircle, Calendar, Phone, Mail, Clock, TagIcon, MessageSquare } from "lucide-react";
+import { EditContactModal } from "./edit-contact-modal";
 
 interface ContactDetailsModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export function ContactDetailsModal({
   onMarkContacted 
 }: ContactDetailsModalProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { toast } = useToast();
 
   const deleteContactMutation = useMutation({
@@ -152,7 +154,12 @@ export function ContactDetailsModal({
             <DialogTitle className="flex justify-between items-center">
               <span>Contact Details</span>
               <div className="flex space-x-2">
-                <Button size="icon" variant="outline" className="h-8 w-8">
+                <Button 
+                  size="icon" 
+                  variant="outline" 
+                  className="h-8 w-8"
+                  onClick={() => setIsEditModalOpen(true)}
+                >
                   <Pencil className="h-4 w-4" />
                 </Button>
                 <Button 
@@ -328,6 +335,13 @@ export function ContactDetailsModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Contact Modal */}
+      <EditContactModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        contact={contact}
+      />
     </>
   );
 }
