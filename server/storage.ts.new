@@ -155,7 +155,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(contactLogs)
       .where(eq(contactLogs.contactId, id))
-      .orderBy(desc(contactLogs.contactDate));
+      .orderBy(desc(contactLogs.date));
     
     return {
       ...contact,
@@ -293,7 +293,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(contactLogs)
       .where(eq(contactLogs.contactId, contactId))
-      .orderBy(desc(contactLogs.contactDate));
+      .orderBy(desc(contactLogs.date));
   }
 
   async createContactLog(contactLogData: InsertContactLog): Promise<ContactLog> {
@@ -307,9 +307,9 @@ export class DatabaseStorage implements IStorage {
       nextContactDate.setDate(nextContactDate.getDate() + contact.reminderFrequency);
       
       await this.updateContact(contact.id, {
-        lastContactDate: contactLogData.contactDate,
+        lastContactDate: contactLogData.date,
         nextContactDate,
-        lastResponseDate: contactLogData.gotResponse ? contactLogData.contactDate : contact.lastResponseDate
+        lastResponseDate: contactLogData.responseReceived ? contactLogData.date : contact.lastResponseDate
       });
       
       // Calculate and update relationship metrics
@@ -331,18 +331,18 @@ export class DatabaseStorage implements IStorage {
     
     // Calculate metrics
     const totalLogs = logs.length;
-    const responseLogs = logs.filter(log => log.gotResponse).length;
+    const responseLogs = logs.filter(log => log.responseReceived).length;
     const responseRate = totalLogs > 0 ? responseLogs / totalLogs : 0;
     
     // Calculate contact frequency (average days between contacts)
     let contactFrequency = contact.reminderFrequency;
     if (logs.length > 1) {
-      const sortedLogs = [...logs].sort((a, b) => new Date(a.contactDate).getTime() - new Date(b.contactDate).getTime());
+      const sortedLogs = [...logs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       let totalDays = 0;
       
       for (let i = 1; i < sortedLogs.length; i++) {
         const days = Math.round(
-          (new Date(sortedLogs[i].contactDate).getTime() - new Date(sortedLogs[i-1].contactDate).getTime()) / 
+          (new Date(sortedLogs[i].date).getTime() - new Date(sortedLogs[i-1].date).getTime()) / 
           (1000 * 60 * 60 * 24)
         );
         totalDays += days;
@@ -354,12 +354,12 @@ export class DatabaseStorage implements IStorage {
     // Determine trend
     let contactTrend = "stable";
     if (logs.length >= 3) {
-      const sortedLogs = [...logs].sort((a, b) => new Date(a.contactDate).getTime() - new Date(b.contactDate).getTime());
+      const sortedLogs = [...logs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       const recentGaps = [];
       
       for (let i = 1; i < sortedLogs.length; i++) {
         const gap = Math.round(
-          (new Date(sortedLogs[i].contactDate).getTime() - new Date(sortedLogs[i-1].contactDate).getTime()) / 
+          (new Date(sortedLogs[i].date).getTime() - new Date(sortedLogs[i-1].date).getTime()) / 
           (1000 * 60 * 60 * 24)
         );
         recentGaps.push(gap);

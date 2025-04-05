@@ -129,8 +129,8 @@ export type ContactWithTags = {
   contactFrequency: number;
   contactTrend: string;
   lastResponseDate: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | null;
+  updatedAt: Date | null;
   tags: Tag[];
 };
 

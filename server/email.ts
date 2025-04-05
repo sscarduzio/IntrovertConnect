@@ -1,6 +1,12 @@
-import { ContactWithTags } from "@shared/schema";
+import { ContactWithTags, User, users } from "@shared/schema";
 import { storage } from "./storage";
 import sgMail from '@sendgrid/mail';
+import { db } from "./db";
+
+// Helper function to get all users from the database
+async function getAllUsers(): Promise<User[]> {
+  return await db.select().from(users);
+}
 
 // Set the SendGrid API key
 if (!process.env.SENDGRID_API_KEY) {
@@ -82,7 +88,8 @@ export async function processReminders(): Promise<void> {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Set to beginning of day for comparison
     
-    const allUsers = Array.from(storage["users"].values());
+    // Get all users from the database
+    const allUsers = await getAllUsers();
     let remindersProcessed = 0;
     
     for (const user of allUsers) {
