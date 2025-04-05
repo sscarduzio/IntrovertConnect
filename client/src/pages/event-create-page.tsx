@@ -73,14 +73,14 @@ type EventFormValues = z.infer<typeof eventFormSchema>;
 
 export default function EventCreatePage() {
   const [, navigate] = useLocation();
-  const [, params] = useRoute('/events/:id/edit');
+  const [matchesEditRoute, editParams] = useRoute('/events/:id/edit');
   const { toast } = useToast();
   const [isEditMode, setIsEditMode] = useState(false);
   const [pageTitle, setPageTitle] = useState("Create New Event");
   const [submitButtonText, setSubmitButtonText] = useState("Create Event");
 
   // Get eventId from route params if in edit mode
-  const eventId = params?.id ? parseInt(params.id) : -1;
+  const eventId = matchesEditRoute && editParams?.id ? parseInt(editParams.id) : -1;
 
   // Fetch contacts for dropdown
   const { data: contacts, isLoading: contactsLoading } = useQuery<ContactWithTags[]>({
