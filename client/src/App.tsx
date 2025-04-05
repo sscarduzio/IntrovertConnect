@@ -25,6 +25,7 @@ function Router() {
       <ProtectedRoute path="/events" component={EventsPage} />
       <ProtectedRoute path="/events/new" component={EventCreatePage} />
       <ProtectedRoute path="/events/:id" component={EventDetailPage} />
+      <ProtectedRoute path="/events/:id/edit" component={EventCreatePage} />
       <ProtectedRoute path="/import-export" component={ImportExportPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />

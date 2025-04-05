@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import { Loader2, CalendarIcon, Clock } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { insertCalendarEventSchema, ContactWithTags } from "@shared/schema";
+import { insertCalendarEventSchema, ContactWithTags, CalendarEvent } from "@shared/schema";
 import Navbar from "@/components/navbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -36,8 +36,8 @@ import {
 
 const eventFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  description: z.string().nullable().optional(),
-  location: z.string().nullable().optional(),
+  description: z.string().optional().default(""),
+  location: z.string().optional().default(""),
   contactId: z.number({
     required_error: "Contact is required"
   }),
@@ -73,11 +73,24 @@ type EventFormValues = z.infer<typeof eventFormSchema>;
 
 export default function EventCreatePage() {
   const [, navigate] = useLocation();
+  const [, params] = useRoute('/events/:id/edit');
   const { toast } = useToast();
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [pageTitle, setPageTitle] = useState("Create New Event");
+  const [submitButtonText, setSubmitButtonText] = useState("Create Event");
+
+  // Get eventId from route params if in edit mode
+  const eventId = params?.id ? parseInt(params.id) : -1;
 
   // Fetch contacts for dropdown
   const { data: contacts, isLoading: contactsLoading } = useQuery<ContactWithTags[]>({
     queryKey: ["/api/contacts"],
+  });
+
+  // Fetch event details if in edit mode
+  const { data: eventData, isLoading: eventLoading } = useQuery<CalendarEvent>({
+    queryKey: ['/api/events', eventId],
+    enabled: eventId > 0,
   });
 
   // Form setup
@@ -94,6 +107,38 @@ export default function EventCreatePage() {
       reminderMinutes: 30,
     },
   });
+  
+  // Update form when event data is loaded
+  useEffect(() => {
+    if (eventData) {
+      setIsEditMode(true);
+      setPageTitle("Edit Event");
+      setSubmitButtonText("Update Event");
+      
+      // Format times for form
+      const startDate = new Date(eventData.startDate);
+      const endDate = new Date(eventData.endDate);
+      
+      const formatTimeForInput = (date: Date) => {
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+      };
+      
+      // Set form values ensuring no null values are passed
+      form.reset({
+        title: eventData.title,
+        description: eventData.description || "",
+        location: eventData.location || "",
+        contactId: eventData.contactId,
+        startDate: startDate,
+        endDate: endDate,
+        startTime: formatTimeForInput(startDate),
+        endTime: formatTimeForInput(endDate),
+        reminderMinutes: eventData.reminderMinutes || 30,
+      });
+    }
+  }, [eventData, form]);
 
   // Create event mutation
   const createEventMutation = useMutation({
@@ -137,11 +182,57 @@ export default function EventCreatePage() {
     },
   });
 
+  // Update event mutation
+  const updateEventMutation = useMutation({
+    mutationFn: async (formData: EventFormValues) => {
+      // Convert form data to API schema
+      const startDateTime = new Date(formData.startDate);
+      const [startHours, startMinutes] = formData.startTime.split(':').map(Number);
+      startDateTime.setHours(startHours, startMinutes);
+
+      const endDateTime = new Date(formData.endDate);
+      const [endHours, endMinutes] = formData.endTime.split(':').map(Number);
+      endDateTime.setHours(endHours, endMinutes);
+
+      const eventDataToUpdate = {
+        ...formData,
+        startDate: startDateTime,
+        endDate: endDateTime,
+      };
+
+      // Remove form-specific fields
+      delete (eventDataToUpdate as any).startTime;
+      delete (eventDataToUpdate as any).endTime;
+
+      const res = await apiRequest("PATCH", `/api/events/${eventId}`, eventDataToUpdate);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Event updated",
+        description: "The event has been successfully updated",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      navigate(`/events/${data.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update event",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: EventFormValues) => {
-    createEventMutation.mutate(data);
+    if (isEditMode) {
+      updateEventMutation.mutate(data);
+    } else {
+      createEventMutation.mutate(data);
+    }
   };
 
-  if (contactsLoading) {
+  if (contactsLoading || (eventId > 0 && eventLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -156,8 +247,12 @@ export default function EventCreatePage() {
       <main className="flex-grow">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900">Create New Event</h1>
-            <p className="text-gray-600 mt-1">Schedule a meetup or event with one of your contacts</p>
+            <h1 className="text-2xl font-bold text-gray-900">{pageTitle}</h1>
+            <p className="text-gray-600 mt-1">
+              {isEditMode 
+                ? "Update details for this event" 
+                : "Schedule a meetup or event with one of your contacts"}
+            </p>
           </div>
 
           <Card>
@@ -401,12 +496,12 @@ export default function EventCreatePage() {
                     </Button>
                     <Button 
                       type="submit" 
-                      disabled={createEventMutation.isPending}
+                      disabled={isEditMode ? updateEventMutation.isPending : createEventMutation.isPending}
                     >
-                      {createEventMutation.isPending && (
+                      {(isEditMode ? updateEventMutation.isPending : createEventMutation.isPending) && (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       )}
-                      Create Event
+                      {submitButtonText}
                     </Button>
                   </div>
                 </form>
