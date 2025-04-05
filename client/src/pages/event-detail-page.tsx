@@ -53,11 +53,7 @@ export default function EventDetailPage() {
     refetchOnMount: true,
   });
 
-  // Debug logs
-  console.log("Event data:", event);
-  console.log("Contact ID:", event?.contactId);
-  
-  // Fetch contact details for this event with improved configuration
+  // Fetch contact details for this event only when event data is available
   const { data: contact, isLoading: contactLoading } = useQuery<ContactWithTags>({
     queryKey: ['/api/contacts', event?.contactId],
     enabled: !!event?.contactId,
@@ -65,13 +61,6 @@ export default function EventDetailPage() {
     refetchOnWindowFocus: true,
     refetchOnMount: true,
   });
-  
-  // Add contact debug logging
-  useEffect(() => {
-    if (contact) {
-      console.log("Contact data:", contact);
-    }
-  }, [contact]);
 
   // Delete event mutation
   const deleteEventMutation = useMutation({
@@ -112,7 +101,7 @@ export default function EventDetailPage() {
       }
       
       const contactLogData = {
-        contactDate: format(startDate, "yyyy-MM-dd"),
+        contactDate: event.startDate, // Use the direct ISO string from the event
         contactType: "event",
         notes: `Attended event: ${event.title}`,
         resetReminder: resetReminder,
@@ -146,10 +135,6 @@ export default function EventDetailPage() {
   });
   
   const markEventAttended = () => {
-    console.log("Marking event as attended");
-    console.log("Contact:", contact);
-    console.log("Event:", event);
-    console.log("Reset reminder:", resetReminder);
     markAttendedMutation.mutate();
   };
 
@@ -429,13 +414,11 @@ export default function EventDetailPage() {
             </CardContent>
             <CardFooter className="border-t pt-6 flex justify-between text-sm text-gray-500">
               <div>
-                Created: {event.createdAt && !isNaN(new Date(event.createdAt).getTime()) 
-                  ? new Date(event.createdAt).toLocaleDateString() 
-                  : "N/A"}
+                Created: {event.createdAt ? new Intl.DateTimeFormat('en-US').format(parseDate(event.createdAt)) : "N/A"}
               </div>
-              {event.updatedAt && !isNaN(new Date(event.updatedAt).getTime()) && (
+              {event.updatedAt && (
                 <div>
-                  Last Updated: {new Date(event.updatedAt).toLocaleDateString()}
+                  Last Updated: {new Intl.DateTimeFormat('en-US').format(parseDate(event.updatedAt))}
                 </div>
               )}
             </CardFooter>
