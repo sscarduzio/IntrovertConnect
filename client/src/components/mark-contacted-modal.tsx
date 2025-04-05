@@ -104,7 +104,7 @@ export function MarkContactedModal({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Log Contact with {contact.firstName} {contact.lastName}</DialogTitle>
+          <DialogTitle>Record Meeting with {contact.firstName} {contact.lastName}</DialogTitle>
         </DialogHeader>
         
         <Form {...form}>
@@ -114,7 +114,7 @@ export function MarkContactedModal({
               name="contactDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contact Date</FormLabel>
+                  <FormLabel>Meeting Date</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
@@ -128,14 +128,14 @@ export function MarkContactedModal({
               name="contactType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contact Type</FormLabel>
+                  <FormLabel>Meeting Type</FormLabel>
                   <Select 
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select contact type" />
+                        <SelectValue placeholder="Select meeting type" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>

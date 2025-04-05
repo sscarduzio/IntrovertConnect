@@ -49,6 +49,8 @@ interface ReminderEvent {
     contactId: number;
     status: string;
     contactName: string;
+    isRecurring?: boolean;
+    recurringFrequency?: number;
   };
   classNames: string[];
 };
@@ -65,18 +67,22 @@ export default function RemindersPage() {
     queryKey: ["/api/dashboard"],
   });
   
-  // Convert contacts to calendar events
+  // Convert contacts to calendar events with recurring reminders
   const reminderEvents: ReminderEvent[] = useMemo(() => {
     if (!data?.dueContacts) return [];
     
-    return data.dueContacts
+    let allEvents: ReminderEvent[] = [];
+    
+    data.dueContacts
       .filter(contact => contact.nextContactDate) 
-      .map(contact => {
-        const date = new Date(contact.nextContactDate!);
+      .forEach(contact => {
+        const nextContactDate = new Date(contact.nextContactDate!);
         const now = new Date();
-        const status = date < now 
+        
+        // Add the next contact date event
+        const status = nextContactDate < now 
           ? 'overdue' 
-          : date.toDateString() === now.toDateString() 
+          : nextContactDate.toDateString() === now.toDateString() 
             ? 'today' 
             : 'upcoming';
             
@@ -85,19 +91,46 @@ export default function RemindersPage() {
         else if (status === 'today') colorClass = 'fc-event-today';
         else colorClass = 'fc-event-upcoming';
             
-        return {
+        allEvents.push({
           id: `reminder-${contact.id}`,
           title: `${contact.firstName} ${contact.lastName}`,
-          start: date,
+          start: nextContactDate,
           allDay: true,
           extendedProps: {
             contactId: contact.id,
             status,
-            contactName: `${contact.firstName} ${contact.lastName}`
+            contactName: `${contact.firstName} ${contact.lastName}`,
+            isRecurring: true,
+            recurringFrequency: contact.reminderFrequency // in months
           },
           classNames: [colorClass]
-        };
+        });
+        
+        // Add future recurring events (project the next 12 months)
+        if (contact.reminderFrequency > 0) {
+          for (let i = 1; i <= 12 / contact.reminderFrequency; i++) {
+            const futureDate = new Date(nextContactDate);
+            futureDate.setMonth(futureDate.getMonth() + (contact.reminderFrequency * i));
+            
+            allEvents.push({
+              id: `reminder-${contact.id}-future-${i}`,
+              title: `${contact.firstName} ${contact.lastName} (Future)`,
+              start: futureDate,
+              allDay: true,
+              extendedProps: {
+                contactId: contact.id,
+                status: 'future',
+                contactName: `${contact.firstName} ${contact.lastName}`,
+                isRecurring: true,
+                recurringFrequency: contact.reminderFrequency
+              },
+              classNames: ['fc-event-future']
+            });
+          }
+        }
       });
+      
+    return allEvents;
   }, [data?.dueContacts]);
   
   const handleEventClick = (info: any) => {
@@ -508,12 +541,24 @@ function getDueStatus(dueDate: Date): string {
   const diffTime = dueDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
+  // Calculate difference in months for a more accurate representation of monthly reminders
+  const diffMonths = (dueDate.getFullYear() - now.getFullYear()) * 12 + (dueDate.getMonth() - now.getMonth());
+  
   if (diffDays < 0) {
-    return `Due ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} ago`;
+    if (Math.abs(diffMonths) > 0) {
+      return `Due ${Math.abs(diffMonths)} month${Math.abs(diffMonths) !== 1 ? 's' : ''} ago`;
+    } else {
+      return `Due ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} ago`;
+    }
   } else if (diffDays === 0) {
     return 'Due today';
   } else {
-    return `Due in ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+    // Use months for periods greater than or equal to 30 days
+    if (diffMonths > 0) {
+      return `Due in ${diffMonths} month${diffMonths !== 1 ? 's' : ''}`;
+    } else {
+      return `Due in ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+    }
   }
 }
 

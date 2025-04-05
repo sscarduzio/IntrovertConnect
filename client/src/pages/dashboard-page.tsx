@@ -268,7 +268,7 @@ export default function DashboardPage() {
               {data?.recentContacts && data.recentContacts.length > 0 ? (
                 <ul className="divide-y divide-gray-200">
                   {data.recentContacts.slice(0, 3).map((contact) => {
-                    const updatedText = getLastUpdateText(new Date(contact.updatedAt));
+                    const updatedText = contact.updatedAt ? getLastUpdateText(new Date(contact.updatedAt)) : "Never updated";
                     
                     return (
                       <li key={contact.id}>
@@ -463,12 +463,24 @@ function getDueStatus(dueDate: Date): string {
   const diffTime = dueDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
+  // Calculate difference in months for a more accurate representation of monthly reminders
+  const diffMonths = (dueDate.getFullYear() - now.getFullYear()) * 12 + (dueDate.getMonth() - now.getMonth());
+  
   if (diffDays < 0) {
-    return `Due ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} ago`;
+    if (Math.abs(diffMonths) > 0) {
+      return `Due ${Math.abs(diffMonths)} month${Math.abs(diffMonths) !== 1 ? 's' : ''} ago`;
+    } else {
+      return `Due ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} ago`;
+    }
   } else if (diffDays === 0) {
     return 'Due today';
   } else {
-    return `Due in ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+    // Use months for periods greater than or equal to 30 days
+    if (diffMonths > 0) {
+      return `Due in ${diffMonths} month${diffMonths !== 1 ? 's' : ''}`;
+    } else {
+      return `Due in ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+    }
   }
 }
 

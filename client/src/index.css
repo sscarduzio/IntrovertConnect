@@ -23,6 +23,10 @@
   .fc-event-upcoming {
     @apply bg-primary border-primary-darker hover:opacity-90;
   }
+  
+  .fc-event-future {
+    @apply bg-gray-300 border-gray-400 hover:opacity-90 opacity-70;
+  }
 
   .fc .fc-button-primary {
     @apply bg-primary border-primary-darker hover:bg-primary/90;

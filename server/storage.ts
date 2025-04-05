@@ -303,12 +303,17 @@ export class DatabaseStorage implements IStorage {
     const contact = await this.getContactById(contactLogData.contactId);
     
     if (contact) {
-      const nextContactDate = new Date();
-      nextContactDate.setDate(nextContactDate.getDate() + contact.reminderFrequency);
+      // Use reminderFrequency from contactLogData if provided, otherwise use the contact's value
+      const reminderFrequency = contactLogData.reminderFrequency || contact.reminderFrequency;
+      
+      // Calculate next contact date by adding months (not days)
+      const nextContactDate = new Date(contactLogData.contactDate);
+      nextContactDate.setMonth(nextContactDate.getMonth() + reminderFrequency);
       
       await this.updateContact(contact.id, {
         lastContactDate: contactLogData.contactDate,
         nextContactDate,
+        reminderFrequency, // Update the reminder frequency if it was changed
         lastResponseDate: contactLogData.gotResponse ? contactLogData.contactDate : contact.lastResponseDate
       });
       
