@@ -474,6 +474,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import/Export routes
+  app.get("/api/export/contacts", ensureAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const contacts = await storage.getContactsByUserId(userId);
+      
+      // Get tags for all contacts
+      const contactsWithTagNames = contacts.map(contact => {
+        // Transform the contact to a simpler format for export
+        const { tags, ...contactBase } = contact;
+        return {
+          ...contactBase,
+          tagNames: tags.map(tag => tag.name)
+        };
+      });
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename=contacts-export-${new Date().toISOString().split('T')[0]}.json`);
+      
+      // Send the contacts as JSON
+      res.json(contactsWithTagNames);
+    } catch (error: any) {
+      console.error('Export error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/import/contacts", ensureAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const contacts = req.body.contacts;
+      
+      if (!Array.isArray(contacts)) {
+        return res.status(400).json({ error: 'Invalid import format. Expected an array of contacts.' });
+      }
+      
+      const importResults = {
+        success: 0,
+        errors: 0,
+        details: [] as string[]
+      };
+      
+      // Process each contact
+      for (const contactData of contacts) {
+        try {
+          // Add userId to the contact
+          const contactToImport = {
+            ...contactData,
+            userId,
+            tagNames: contactData.tagNames || []
+          };
+          
+          // Extract tags before creating contact
+          const tagNames = contactToImport.tagNames;
+          delete contactToImport.tagNames;
+          
+          // Create or find existing tags
+          const contactTags = [];
+          for (const tagName of tagNames) {
+            let tag = await storage.getTagByName(tagName, userId);
+            if (!tag) {
+              tag = await storage.createTag({ name: tagName, userId });
+            }
+            contactTags.push(tag);
+          }
+          
+          // Create contact
+          const contact = await storage.createContact(contactToImport);
+          
+          // Associate tags with contact
+          for (const tag of contactTags) {
+            await storage.createContactTag({ contactId: contact.id, tagId: tag.id });
+          }
+          
+          importResults.success++;
+          importResults.details.push(`Successfully imported ${contactData.firstName} ${contactData.lastName}`);
+        } catch (contactError: any) {
+          importResults.errors++;
+          importResults.details.push(`Error importing ${contactData.firstName || ''} ${contactData.lastName || ''}: ${contactError.message}`);
+        }
+      }
+      
+      res.json(importResults);
+    } catch (error: any) {
+      console.error('Import error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

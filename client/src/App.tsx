@@ -13,6 +13,7 @@ import TagsPage from "@/pages/tags-page";
 import EventsPage from "@/pages/events-page";
 import EventDetailPage from "@/pages/event-detail-page";
 import EventCreatePage from "@/pages/event-create-page";
+import ImportExportPage from "@/pages/import-export-page";
 
 function Router() {
   return (
@@ -24,6 +25,7 @@ function Router() {
       <ProtectedRoute path="/events" component={EventsPage} />
       <ProtectedRoute path="/events/new" component={EventCreatePage} />
       <ProtectedRoute path="/events/:id" component={EventDetailPage} />
+      <ProtectedRoute path="/import-export" component={ImportExportPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>

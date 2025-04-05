@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, AlertCircle, Search, PlusCircle, X } from "lucide-react";
+import { Loader2, AlertCircle, Search, PlusCircle, X, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -121,10 +121,16 @@ export default function ContactsPage() {
           {/* Header */}
           <div className="pb-5 border-b border-gray-200 mb-5 flex items-center justify-between">
             <h1 className="text-2xl font-semibold text-gray-900">Contacts</h1>
-            <Button onClick={() => setIsAddContactModalOpen(true)}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Contact
-            </Button>
+            <div className="flex space-x-2">
+              <Button variant="outline" onClick={() => window.location.href = '/import-export'}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import/Export
+              </Button>
+              <Button onClick={() => setIsAddContactModalOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Contact
+              </Button>
+            </div>
           </div>
 
           {/* Search and filters */}

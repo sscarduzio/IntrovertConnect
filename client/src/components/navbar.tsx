@@ -11,7 +11,9 @@ import {
   LogOut,
   Menu,
   X,
-  Calendar
+  Calendar,
+  Upload,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -97,6 +99,12 @@ export default function Navbar() {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/import-export">
+                    <Upload className="mr-2 h-4 w-4" />
+                    <span>Import/Export</span>
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
@@ -167,6 +175,14 @@ export default function Navbar() {
               <Settings className="mr-3 h-5 w-5" />
               Settings
             </button>
+            <Link
+              href="/import-export"
+              className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 w-full text-left flex items-center"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <Upload className="mr-3 h-5 w-5" />
+              Import/Export
+            </Link>
             <button
               className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 w-full text-left flex items-center"
               onClick={handleLogout}
