@@ -246,6 +246,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manually trigger reminders for a specific user
+  app.post("/api/user-reminders", ensureAuthenticated, async (req, res) => {
+    try {
+      const { processUserReminders } = require("./email");
+      const reminderCount = await processUserReminders(req.user!.id);
+      
+      res.status(200).json({ 
+        message: `Reminders processed successfully`,
+        count: reminderCount 
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Error processing user reminders", error });
+    }
+  });
+  
+  // Manually send a reminder for a specific contact
+  app.post("/api/contacts/:id/send-reminder", ensureAuthenticated, async (req, res) => {
+    try {
+      const contactId = parseInt(req.params.id);
+      
+      // Check if contact exists and belongs to user
+      const contact = await storage.getContactById(contactId);
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      
+      if (contact.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Send the reminder email
+      const { sendReminderEmail } = require("./email");
+      await sendReminderEmail(contact, req.user!.email);
+      
+      res.status(200).json({ message: "Reminder sent successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Error sending reminder", error });
+    }
+  });
+  
+  // Get reminders status
+  app.get("/api/reminders-status", ensureAuthenticated, async (req, res) => {
+    try {
+      const contacts = await storage.getDueContacts(req.user!.id);
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Count overdue, due today, and upcoming reminders
+      const overdueCount = contacts.filter(c => {
+        if (!c.nextContactDate) return false;
+        const date = new Date(c.nextContactDate);
+        date.setHours(0, 0, 0, 0);
+        return date < today;
+      }).length;
+      
+      const dueTodayCount = contacts.filter(c => {
+        if (!c.nextContactDate) return false;
+        const date = new Date(c.nextContactDate);
+        date.setHours(0, 0, 0, 0);
+        return date.getTime() === today.getTime();
+      }).length;
+      
+      const upcomingCount = contacts.filter(c => {
+        if (!c.nextContactDate) return false;
+        const date = new Date(c.nextContactDate);
+        date.setHours(0, 0, 0, 0);
+        return date > today;
+      }).length;
+      
+      res.json({
+        total: contacts.length,
+        overdue: overdueCount,
+        dueToday: dueTodayCount,
+        upcoming: upcomingCount
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Error getting reminders status", error });
+    }
+  });
+
   // Calendar Events routes
   app.get("/api/events", ensureAuthenticated, async (req, res) => {
     try {

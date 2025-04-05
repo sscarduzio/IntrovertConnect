@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, AlertCircle, Filter, CalendarIcon, ListIcon, Plus } from "lucide-react";
+import { Loader2, AlertCircle, Filter, CalendarIcon, ListIcon, Plus, Mail, CheckCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -191,6 +193,62 @@ export default function RemindersPage() {
     );
   }
 
+  const [isProcessingReminders, setIsProcessingReminders] = useState(false);
+  const [reminderStatus, setReminderStatus] = useState<{
+    total: number;
+    overdue: number;
+    dueToday: number;
+    upcoming: number;
+  } | null>(null);
+  const [reminderResponse, setReminderResponse] = useState<string | null>(null);
+  
+  // Fetch reminder status
+  const fetchReminderStatus = async () => {
+    try {
+      const response = await fetch("/api/reminders-status", {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch reminder status");
+      const data = await response.json();
+      setReminderStatus(data);
+    } catch (error) {
+      console.error("Error fetching reminder status:", error);
+    }
+  };
+  
+  // Process reminders for the current user
+  const processReminders = async () => {
+    try {
+      setIsProcessingReminders(true);
+      setReminderResponse(null);
+      
+      const response = await fetch("/api/user-reminders", {
+        method: "POST",
+        credentials: "include",
+      });
+      
+      if (!response.ok) throw new Error("Failed to process reminders");
+      
+      const data = await response.json();
+      setReminderResponse(`${data.count} reminder${data.count !== 1 ? 's' : ''} sent successfully!`);
+      
+      // Refresh reminder status
+      fetchReminderStatus();
+    } catch (error) {
+      console.error("Error processing reminders:", error);
+      setReminderResponse("Failed to send reminders. Please try again.");
+    } finally {
+      setIsProcessingReminders(false);
+    }
+  };
+  
+  // Fetch reminder status on initial load
+  useEffect(() => {
+    if (data) {
+      fetchReminderStatus();
+    }
+  }, [data]);
+  
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -198,14 +256,42 @@ export default function RemindersPage() {
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Header */}
-          <div className="pb-5 border-b border-gray-200 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h1 className="text-2xl font-semibold text-gray-900">Follow-up Reminders</h1>
-            <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
+          <div className="pb-5 border-b border-gray-200 mb-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Follow-up Reminders</h1>
+              {reminderStatus && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-100 border-red-200">
+                    {reminderStatus.overdue} overdue
+                  </Badge>
+                  <Badge variant="outline" className="bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200">
+                    {reminderStatus.dueToday} due today
+                  </Badge>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200">
+                    {reminderStatus.upcoming} upcoming
+                  </Badge>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <Button 
+                onClick={processReminders} 
+                disabled={isProcessingReminders}
+                className="w-full sm:w-auto flex items-center justify-center gap-2"
+              >
+                {isProcessingReminders ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4" />
+                )}
+                Send Due Reminders
+              </Button>
+              
               {/* Filter */}
-              <div className="flex items-center">
+              <div className="flex items-center w-full sm:w-auto">
                 <Filter className="mr-2 h-4 w-4 text-gray-500" />
                 <Select value={timePeriod} onValueChange={setTimePeriod}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Filter by time" />
                   </SelectTrigger>
                   <SelectContent>
@@ -219,6 +305,15 @@ export default function RemindersPage() {
               </div>
             </div>
           </div>
+          
+          {/* Reminder Response */}
+          {reminderResponse && (
+            <Alert className="mb-5">
+              <CheckCircle className="h-4 w-4" />
+              <AlertTitle>Success</AlertTitle>
+              <AlertDescription>{reminderResponse}</AlertDescription>
+            </Alert>
+          )}
 
           {/* Content */}
           <Tabs value={viewMode} onValueChange={setViewMode} className="w-full">
