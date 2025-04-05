@@ -50,6 +50,10 @@ export default function EventDetailPage() {
     enabled: eventId > 0,
   });
 
+  // Log the event data for debugging
+  console.log("Event ID:", eventId);
+  console.log("Event data:", event);
+
   // Fetch contact details for this event
   const { data: contact, isLoading: contactLoading } = useQuery<ContactWithTags>({
     queryKey: ['/api/contacts', event?.contactId],
@@ -243,14 +247,16 @@ export default function EventDetailPage() {
                   </div>
                 </div>
                 <div className="flex space-x-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => navigate(`/events/${event.id}/edit`)}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
+                  {/* Debug logs to see what's in the event ID */}
+                  {console.log("Event ID in Edit button:", event.id)}
+                  {console.log("Full event object:", event)}
+                  
+                  <Link href={`/events/${eventId}/edit`}>
+                    <Button variant="outline" size="sm">
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                  </Link>
                   <Button variant="outline" size="sm" onClick={handleDeleteClick}>
                     <Trash className="h-4 w-4 mr-2" />
                     Delete

@@ -78,11 +78,16 @@ export default function EventCreatePage() {
   const [pageTitle, setPageTitle] = useState("Create New Event");
   const [submitButtonText, setSubmitButtonText] = useState("Create Event");
 
+  // Debug the current URL
+  console.log("Current location:", location);
+  
   // Check if we're in edit mode by looking at the URL pattern
   const editMatch = location.match(/^\/events\/(\d+)\/edit$/);
+  console.log("Edit match result:", editMatch);
   
-  // Get eventId from URL if in edit mode
+  // Get eventId from route params if in edit mode
   const eventId = editMatch ? parseInt(editMatch[1]) : -1;
+  console.log("Extracted event ID:", eventId);
 
   // Fetch contacts for dropdown
   const { data: contacts, isLoading: contactsLoading } = useQuery<ContactWithTags[]>({
