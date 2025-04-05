@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute, Link } from "wouter";
 import { 
@@ -44,19 +44,34 @@ export default function EventDetailPage() {
   
   const eventId = params?.id ? parseInt(params.id) : -1;
 
-  // Fetch event details
+  // Fetch event details with proper configuration
   const { data: event, isLoading: eventLoading, error: eventError } = useQuery<CalendarEvent>({
     queryKey: ['/api/events', eventId],
     enabled: eventId > 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
-  // Adding a comment to replace the debug logs
-
-  // Fetch contact details for this event
+  // Debug logs
+  console.log("Event data:", event);
+  console.log("Contact ID:", event?.contactId);
+  
+  // Fetch contact details for this event with improved configuration
   const { data: contact, isLoading: contactLoading } = useQuery<ContactWithTags>({
     queryKey: ['/api/contacts', event?.contactId],
     enabled: !!event?.contactId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
+  
+  // Add contact debug logging
+  useEffect(() => {
+    if (contact) {
+      console.log("Contact data:", contact);
+    }
+  }, [contact]);
 
   // Delete event mutation
   const deleteEventMutation = useMutation({
@@ -131,6 +146,10 @@ export default function EventDetailPage() {
   });
   
   const markEventAttended = () => {
+    console.log("Marking event as attended");
+    console.log("Contact:", contact);
+    console.log("Event:", event);
+    console.log("Reset reminder:", resetReminder);
     markAttendedMutation.mutate();
   };
 
