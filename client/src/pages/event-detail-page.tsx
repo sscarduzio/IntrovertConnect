@@ -50,9 +50,7 @@ export default function EventDetailPage() {
     enabled: eventId > 0,
   });
 
-  // Log the event data for debugging
-  console.log("Event ID:", eventId);
-  console.log("Event data:", event);
+  // Adding a comment to replace the debug logs
 
   // Fetch contact details for this event
   const { data: contact, isLoading: contactLoading } = useQuery<ContactWithTags>({
@@ -247,17 +245,19 @@ export default function EventDetailPage() {
                   </div>
                 </div>
                 <div className="flex space-x-2">
-                  {/* Debug logs to see what's in the event ID */}
-                  {console.log("Event ID in Edit button:", event.id)}
-                  {console.log("Full event object:", event)}
-                  
-                  <Link href={`/events/${eventId}/edit`}>
-                    <Button variant="outline" size="sm">
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                  </Link>
-                  <Button variant="outline" size="sm" onClick={handleDeleteClick}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate(`/events/${eventId}/edit`)}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleDeleteClick}
+                  >
                     <Trash className="h-4 w-4 mr-2" />
                     Delete
                   </Button>
@@ -291,11 +291,12 @@ export default function EventDetailPage() {
                     <div>
                       <h3 className="font-medium">Contact</h3>
                       <p className="text-gray-700">
-                        <Link href={`/contacts/${contact.id}`}>
-                          <span className="text-primary hover:underline cursor-pointer">
-                            {`${contact.firstName} ${contact.lastName}`}
-                          </span>
-                        </Link>
+                        <span
+                          className="text-primary hover:underline cursor-pointer"
+                          onClick={() => navigate(`/contacts/${contact.id}`)}
+                        >
+                          {`${contact.firstName} ${contact.lastName}`}
+                        </span>
                       </p>
                       
                       {contact.tags && contact.tags.length > 0 && (

@@ -122,28 +122,57 @@ export default function EventCreatePage() {
       setPageTitle("Edit Event");
       setSubmitButtonText("Update Event");
       
-      // Format times for form
-      const startDate = new Date(eventData.startDate);
-      const endDate = new Date(eventData.endDate);
-      
-      const formatTimeForInput = (date: Date) => {
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
-      };
-      
-      // Set form values ensuring no null values are passed
-      form.reset({
-        title: eventData.title,
-        description: eventData.description || "",
-        location: eventData.location || "",
-        contactId: eventData.contactId,
-        startDate: startDate,
-        endDate: endDate,
-        startTime: formatTimeForInput(startDate),
-        endTime: formatTimeForInput(endDate),
-        reminderMinutes: eventData.reminderMinutes || 30,
-      });
+      // Format times for form - using defensive checks for date parsing
+      try {
+        // Ensure startDate and endDate are valid dates
+        const startDate = eventData.startDate ? new Date(eventData.startDate) : new Date();
+        const endDate = eventData.endDate ? new Date(eventData.endDate) : new Date();
+        
+        // Make sure the dates are valid
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          console.error("Invalid date format in event data", eventData);
+          // Use current date as fallback
+          const now = new Date();
+          const oneHourLater = new Date(now);
+          oneHourLater.setHours(oneHourLater.getHours() + 1);
+          
+          // Set form with default dates
+          form.reset({
+            title: eventData.title,
+            description: eventData.description || "",
+            location: eventData.location || "",
+            contactId: eventData.contactId,
+            startDate: now,
+            endDate: oneHourLater,
+            startTime: "09:00",
+            endTime: "10:00",
+            reminderMinutes: eventData.reminderMinutes || 30,
+          });
+          return;
+        }
+        
+        // Format time string for input
+        const formatTimeForInput = (date: Date) => {
+          const hours = date.getHours().toString().padStart(2, '0');
+          const minutes = date.getMinutes().toString().padStart(2, '0');
+          return `${hours}:${minutes}`;
+        };
+        
+        // Set form values ensuring no null values are passed
+        form.reset({
+          title: eventData.title,
+          description: eventData.description || "",
+          location: eventData.location || "",
+          contactId: eventData.contactId,
+          startDate: startDate,
+          endDate: endDate,
+          startTime: formatTimeForInput(startDate),
+          endTime: formatTimeForInput(endDate),
+          reminderMinutes: eventData.reminderMinutes || 30,
+        });
+      } catch (error) {
+        console.error("Error processing event dates:", error);
+      }
     }
   }, [eventData, form]);
 
