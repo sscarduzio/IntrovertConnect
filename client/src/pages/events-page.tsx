@@ -65,7 +65,7 @@ export default function EventsPage() {
           {/* Events Header */}
           <div className="pb-5 border-b border-gray-200 mb-5 flex items-center justify-between">
             <h1 className="text-2xl font-semibold text-gray-900">Calendar Events</h1>
-            <Link href="/contacts">
+            <Link href="/events/new">
               <Button>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Create Event
