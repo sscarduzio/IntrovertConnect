@@ -167,12 +167,55 @@ export default function EventDetailPage() {
 
   // Format dates
   // Make sure we have valid dates before formatting
-  const startDateStr = event.startDate?.toString();
-  const endDateStr = event.endDate?.toString();
+  // Handle date parsing with extra validation
+  const parseDate = (dateValue: any): Date => {
+    try {
+      // Handle null or undefined values
+      if (!dateValue) {
+        console.warn("Received null/undefined date value");
+        return new Date();
+      }
+      
+      // If it's a string, parse it with error checking
+      if (typeof dateValue === 'string') {
+        const parsedDate = new Date(dateValue);
+        if (isNaN(parsedDate.getTime())) {
+          console.error("Invalid date string:", dateValue);
+          return new Date(); // Fallback to current date
+        }
+        return parsedDate;
+      }
+      
+      // If it's already a Date object, validate it
+      if (dateValue instanceof Date) {
+        if (isNaN(dateValue.getTime())) {
+          console.error("Invalid Date object:", dateValue);
+          return new Date(); // Fallback to current date
+        }
+        return dateValue;
+      }
+      
+      // If it's a timestamp number
+      if (typeof dateValue === 'number') {
+        const parsedDate = new Date(dateValue);
+        if (isNaN(parsedDate.getTime())) {
+          console.error("Invalid timestamp:", dateValue);
+          return new Date(); // Fallback to current date
+        }
+        return parsedDate;
+      }
+      
+      // For any other type, log and use fallback
+      console.error("Unsupported date format:", typeof dateValue, dateValue);
+      return new Date();
+    } catch (error) {
+      console.error("Error parsing date:", error, dateValue);
+      return new Date(); // Fallback to current date in case of exceptions
+    }
+  };
   
-  // Create dates only if we have valid strings
-  const startDate = startDateStr ? new Date(startDateStr) : new Date();
-  const endDate = endDateStr ? new Date(endDateStr) : new Date();
+  const startDate = parseDate(event.startDate);
+  const endDate = parseDate(event.endDate);
   
   // Check if the dates are valid before formatting
   const isStartDateValid = !isNaN(startDate.getTime());
@@ -285,31 +328,42 @@ export default function EventDetailPage() {
                   </div>
                 )}
 
-                {contact && (
+                {event.contactId && (
                   <div className="flex items-start space-x-4">
                     <User className="h-5 w-5 text-gray-500 mt-0.5" />
                     <div>
                       <h3 className="font-medium">Contact</h3>
-                      <p className="text-gray-700">
-                        <span
-                          className="text-primary hover:underline cursor-pointer"
-                          onClick={() => navigate(`/contacts/${contact.id}`)}
-                        >
-                          {`${contact.firstName} ${contact.lastName}`}
-                        </span>
-                      </p>
-                      
-                      {contact.tags && contact.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {contact.tags.map(tag => (
-                            <span 
-                              key={tag.id} 
-                              className="px-2 py-1 rounded-full bg-gray-100 text-gray-800 text-xs"
-                            >
-                              {tag.name}
-                            </span>
-                          ))}
+                      {contactLoading ? (
+                        <div className="flex items-center mt-1">
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <p className="text-gray-500">Loading contact...</p>
                         </div>
+                      ) : contact ? (
+                        <>
+                          <p className="text-gray-700">
+                            <span
+                              className="text-primary hover:underline cursor-pointer"
+                              onClick={() => navigate(`/contacts?id=${contact.id}`)}
+                            >
+                              {`${contact.firstName} ${contact.lastName}`}
+                            </span>
+                          </p>
+                          
+                          {contact.tags && contact.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {contact.tags.map(tag => (
+                                <span 
+                                  key={tag.id} 
+                                  className="px-2 py-1 rounded-full bg-gray-100 text-gray-800 text-xs"
+                                >
+                                  {tag.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-gray-500">Contact not found</p>
                       )}
                     </div>
                   </div>
@@ -331,7 +385,10 @@ export default function EventDetailPage() {
                     <div>
                       <h3 className="font-medium">Reminder</h3>
                       <p className="text-gray-700">
-                        {event.reminderMinutes} minutes before the event
+                        {event.reminderMinutes === 0 ? 
+                          "No reminder set" : 
+                          `${event.reminderMinutes} minutes before the event`
+                        }
                       </p>
                     </div>
                   </div>
@@ -353,9 +410,11 @@ export default function EventDetailPage() {
             </CardContent>
             <CardFooter className="border-t pt-6 flex justify-between text-sm text-gray-500">
               <div>
-                Created: {new Date(event.createdAt || "").toLocaleDateString()}
+                Created: {event.createdAt && !isNaN(new Date(event.createdAt).getTime()) 
+                  ? new Date(event.createdAt).toLocaleDateString() 
+                  : "N/A"}
               </div>
-              {event.updatedAt && (
+              {event.updatedAt && !isNaN(new Date(event.updatedAt).getTime()) && (
                 <div>
                   Last Updated: {new Date(event.updatedAt).toLocaleDateString()}
                 </div>

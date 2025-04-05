@@ -124,9 +124,28 @@ export default function EventCreatePage() {
       
       // Format times for form - using defensive checks for date parsing
       try {
+        // Helper function to safely parse dates
+        const parseDate = (dateValue: any): Date => {
+          if (!dateValue) return new Date();
+          
+          // If it's a string, parse it
+          if (typeof dateValue === 'string') {
+            const parsedDate = new Date(dateValue);
+            return !isNaN(parsedDate.getTime()) ? parsedDate : new Date();
+          }
+          
+          // If it's already a Date object
+          if (dateValue instanceof Date) {
+            return !isNaN(dateValue.getTime()) ? dateValue : new Date();
+          }
+          
+          // Default fallback
+          return new Date();
+        };
+        
         // Ensure startDate and endDate are valid dates
-        const startDate = eventData.startDate ? new Date(eventData.startDate) : new Date();
-        const endDate = eventData.endDate ? new Date(eventData.endDate) : new Date();
+        const startDate = parseDate(eventData.startDate);
+        const endDate = parseDate(eventData.endDate);
         
         // Make sure the dates are valid
         if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
@@ -153,6 +172,9 @@ export default function EventCreatePage() {
         
         // Format time string for input
         const formatTimeForInput = (date: Date) => {
+          if (!date || isNaN(date.getTime())) {
+            return "00:00";
+          }
           const hours = date.getHours().toString().padStart(2, '0');
           const minutes = date.getMinutes().toString().padStart(2, '0');
           return `${hours}:${minutes}`;
@@ -179,27 +201,64 @@ export default function EventCreatePage() {
   // Create event mutation
   const createEventMutation = useMutation({
     mutationFn: async (formData: EventFormValues) => {
-      // Convert form data to API schema
-      const startDateTime = new Date(formData.startDate);
-      const [startHours, startMinutes] = formData.startTime.split(':').map(Number);
-      startDateTime.setHours(startHours, startMinutes);
+      try {
+        // Convert form data to API schema with robust error handling
+        const startDateTime = new Date(formData.startDate);
+        if (isNaN(startDateTime.getTime())) {
+          throw new Error("Invalid start date");
+        }
+        
+        // Handle time parsing safely
+        const startTimeParts = formData.startTime.split(':');
+        if (startTimeParts.length !== 2) {
+          throw new Error("Invalid start time format");
+        }
+        
+        const startHours = parseInt(startTimeParts[0], 10);
+        const startMinutes = parseInt(startTimeParts[1], 10);
+        
+        if (isNaN(startHours) || isNaN(startMinutes)) {
+          throw new Error("Invalid start time values");
+        }
+        
+        startDateTime.setHours(startHours, startMinutes, 0, 0);
 
-      const endDateTime = new Date(formData.endDate);
-      const [endHours, endMinutes] = formData.endTime.split(':').map(Number);
-      endDateTime.setHours(endHours, endMinutes);
+        // Same for end date and time
+        const endDateTime = new Date(formData.endDate);
+        if (isNaN(endDateTime.getTime())) {
+          throw new Error("Invalid end date");
+        }
+        
+        const endTimeParts = formData.endTime.split(':');
+        if (endTimeParts.length !== 2) {
+          throw new Error("Invalid end time format");
+        }
+        
+        const endHours = parseInt(endTimeParts[0], 10);
+        const endMinutes = parseInt(endTimeParts[1], 10);
+        
+        if (isNaN(endHours) || isNaN(endMinutes)) {
+          throw new Error("Invalid end time values");
+        }
+        
+        endDateTime.setHours(endHours, endMinutes, 0, 0);
 
-      const eventData = {
-        ...formData,
-        startDate: startDateTime,
-        endDate: endDateTime,
-      };
+        const eventData = {
+          ...formData,
+          startDate: startDateTime,
+          endDate: endDateTime,
+        };
 
-      // Remove form-specific fields
-      delete (eventData as any).startTime;
-      delete (eventData as any).endTime;
+        // Remove form-specific fields
+        delete (eventData as any).startTime;
+        delete (eventData as any).endTime;
 
-      const res = await apiRequest("POST", "/api/events", eventData);
-      return await res.json();
+        const res = await apiRequest("POST", "/api/events", eventData);
+        return await res.json();
+      } catch (error) {
+        console.error("Error processing event data:", error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       toast({
@@ -221,27 +280,64 @@ export default function EventCreatePage() {
   // Update event mutation
   const updateEventMutation = useMutation({
     mutationFn: async (formData: EventFormValues) => {
-      // Convert form data to API schema
-      const startDateTime = new Date(formData.startDate);
-      const [startHours, startMinutes] = formData.startTime.split(':').map(Number);
-      startDateTime.setHours(startHours, startMinutes);
+      try {
+        // Convert form data to API schema with robust error handling
+        const startDateTime = new Date(formData.startDate);
+        if (isNaN(startDateTime.getTime())) {
+          throw new Error("Invalid start date");
+        }
+        
+        // Handle time parsing safely
+        const startTimeParts = formData.startTime.split(':');
+        if (startTimeParts.length !== 2) {
+          throw new Error("Invalid start time format");
+        }
+        
+        const startHours = parseInt(startTimeParts[0], 10);
+        const startMinutes = parseInt(startTimeParts[1], 10);
+        
+        if (isNaN(startHours) || isNaN(startMinutes)) {
+          throw new Error("Invalid start time values");
+        }
+        
+        startDateTime.setHours(startHours, startMinutes, 0, 0);
 
-      const endDateTime = new Date(formData.endDate);
-      const [endHours, endMinutes] = formData.endTime.split(':').map(Number);
-      endDateTime.setHours(endHours, endMinutes);
+        // Same for end date and time
+        const endDateTime = new Date(formData.endDate);
+        if (isNaN(endDateTime.getTime())) {
+          throw new Error("Invalid end date");
+        }
+        
+        const endTimeParts = formData.endTime.split(':');
+        if (endTimeParts.length !== 2) {
+          throw new Error("Invalid end time format");
+        }
+        
+        const endHours = parseInt(endTimeParts[0], 10);
+        const endMinutes = parseInt(endTimeParts[1], 10);
+        
+        if (isNaN(endHours) || isNaN(endMinutes)) {
+          throw new Error("Invalid end time values");
+        }
+        
+        endDateTime.setHours(endHours, endMinutes, 0, 0);
 
-      const eventDataToUpdate = {
-        ...formData,
-        startDate: startDateTime,
-        endDate: endDateTime,
-      };
+        const eventDataToUpdate = {
+          ...formData,
+          startDate: startDateTime,
+          endDate: endDateTime,
+        };
 
-      // Remove form-specific fields
-      delete (eventDataToUpdate as any).startTime;
-      delete (eventDataToUpdate as any).endTime;
+        // Remove form-specific fields
+        delete (eventDataToUpdate as any).startTime;
+        delete (eventDataToUpdate as any).endTime;
 
-      const res = await apiRequest("PATCH", `/api/events/${eventId}`, eventDataToUpdate);
-      return await res.json();
+        const res = await apiRequest("PATCH", `/api/events/${eventId}`, eventDataToUpdate);
+        return await res.json();
+      } catch (error) {
+        console.error("Error processing event data:", error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       toast({
