@@ -243,12 +243,14 @@ export default function EventDetailPage() {
                   </div>
                 </div>
                 <div className="flex space-x-2">
-                  <Link href={`/events/${event.id}/edit`}>
-                    <Button variant="outline" size="sm">
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                  </Link>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate(`/events/${event.id}/edit`)}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
                   <Button variant="outline" size="sm" onClick={handleDeleteClick}>
                     <Trash className="h-4 w-4 mr-2" />
                     Delete

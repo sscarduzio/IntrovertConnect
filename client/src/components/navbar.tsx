@@ -95,9 +95,11 @@ export default function Navbar() {
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/import-export">
@@ -169,12 +171,14 @@ export default function Navbar() {
               <User className="mr-3 h-5 w-5" />
               Profile
             </button>
-            <button
+            <Link
+              href="/settings"
               className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 w-full text-left flex items-center"
+              onClick={() => setIsMobileMenuOpen(false)}
             >
               <Settings className="mr-3 h-5 w-5" />
               Settings
-            </button>
+            </Link>
             <Link
               href="/import-export"
               className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 w-full text-left flex items-center"

@@ -1,15 +1,20 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth } from "./auth";
-import { processReminders } from "./email";
+import { setupAuth, hashPassword, comparePasswords } from "./auth";
+import { processReminders, sendReminderEmail } from "./email";
 import { z } from "zod";
 import { 
   insertContactSchema, 
   insertTagSchema, 
   insertContactLogSchema,
-  insertCalendarEventSchema
+  insertCalendarEventSchema, 
+  insertUserSchema,
+  users,
+  ContactWithTags
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 // Middleware to ensure user is authenticated
 function ensureAuthenticated(req: Request, res: Response, next: Function) {
@@ -561,6 +566,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Import error:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // User settings routes
+  app.put("/api/user", ensureAuthenticated, async (req, res) => {
+    try {
+      // Validate request body
+      const schema = z.object({
+        username: z.string().min(3),
+        email: z.string().email()
+      });
+      
+      const validated = schema.parse(req.body);
+      
+      // Check if username is taken (if changing username)
+      if (validated.username !== req.user!.username) {
+        const existingUser = await storage.getUserByUsername(validated.username);
+        if (existingUser) {
+          return res.status(400).json({ message: "Username already taken" });
+        }
+      }
+      
+      // Check if email is taken (if changing email)
+      if (validated.email !== req.user!.email) {
+        const existingUser = await storage.getUserByEmail(validated.email);
+        if (existingUser) {
+          return res.status(400).json({ message: "Email already taken" });
+        }
+      }
+      
+      // Update user
+      await db.update(users)
+        .set({
+          username: validated.username,
+          email: validated.email
+        })
+        .where(eq(users.id, req.user!.id));
+      
+      // Get updated user
+      const updatedUser = await storage.getUser(req.user!.id);
+      
+      // Update session user
+      req.user = updatedUser;
+      
+      res.json(updatedUser);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid user data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Error updating user", error });
+    }
+  });
+  
+  // Change password
+  app.put("/api/user/password", ensureAuthenticated, async (req, res) => {
+    try {
+      // Validate request body
+      const schema = z.object({
+        currentPassword: z.string(),
+        newPassword: z.string().min(8),
+        confirmPassword: z.string()
+      }).refine(data => data.newPassword === data.confirmPassword, {
+        message: "Passwords do not match",
+        path: ["confirmPassword"]
+      });
+      
+      const validated = schema.parse(req.body);
+      
+      // Verify current password
+      const user = await storage.getUser(req.user!.id);
+      
+      // Use imported helper functions from top of file
+      
+      if (!user || !(await comparePasswords(validated.currentPassword, user.password))) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+      
+      // Update password
+      const hashedPassword = await hashPassword(validated.newPassword);
+      
+      await db.update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, req.user!.id));
+      
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid password data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Error updating password", error });
+    }
+  });
+  
+  // Send test email
+  app.post("/api/user/test-email", ensureAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Create a simple test contact
+      const testContact: ContactWithTags = {
+        id: 0,
+        userId: user.id,
+        firstName: "Test",
+        lastName: "Contact",
+        email: null,
+        phone: null,
+        notes: "This is a test reminder email to verify your email settings.",
+        lastContactDate: new Date(),
+        nextContactDate: new Date(), 
+        reminderFrequency: 1,
+        relationshipScore: 50,
+        contactFrequency: 0,
+        contactTrend: "stable",
+        lastResponseDate: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        tags: [{ id: 0, name: "Test", userId: user.id, createdAt: new Date() }]
+      };
+      
+      // Send test email
+      await sendReminderEmail(testContact, user.email);
+      
+      res.json({ message: "Test email sent successfully" });
+    } catch (error) {
+      console.error("Error sending test email:", error);
+      res.status(500).json({ message: "Error sending test email", error });
     }
   });
 
