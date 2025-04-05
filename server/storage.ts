@@ -303,19 +303,29 @@ export class DatabaseStorage implements IStorage {
     const contact = await this.getContactById(contactLogData.contactId);
     
     if (contact) {
-      // Use reminderFrequency from contactLogData if provided, otherwise use the contact's value
-      const reminderFrequency = contactLogData.reminderFrequency || contact.reminderFrequency;
+      // Check for resetReminder flag - if it's false, don't update the next contact date
+      const shouldResetReminder = contactLogData.resetReminder !== false; // Default to true if not specified
       
-      // Calculate next contact date by adding months (not days)
-      const nextContactDate = new Date(contactLogData.contactDate);
-      nextContactDate.setMonth(nextContactDate.getMonth() + reminderFrequency);
-      
-      await this.updateContact(contact.id, {
+      // Basic update with lastContactDate always
+      const updateData: Partial<InsertContact> = {
         lastContactDate: contactLogData.contactDate,
-        nextContactDate,
-        reminderFrequency, // Update the reminder frequency if it was changed
         lastResponseDate: contactLogData.gotResponse ? contactLogData.contactDate : contact.lastResponseDate
-      });
+      };
+      
+      // Only update nextContactDate and reminderFrequency if we should reset the reminder
+      if (shouldResetReminder) {
+        // Use reminderFrequency from contactLogData if provided, otherwise use the contact's value
+        const reminderFrequency = contactLogData.reminderFrequency || contact.reminderFrequency;
+        
+        // Calculate next contact date by adding months (not days)
+        const nextContactDate = new Date(contactLogData.contactDate);
+        nextContactDate.setMonth(nextContactDate.getMonth() + reminderFrequency);
+        
+        updateData.nextContactDate = nextContactDate;
+        updateData.reminderFrequency = reminderFrequency; // Update the reminder frequency if it was changed
+      }
+      
+      await this.updateContact(contact.id, updateData);
       
       // Calculate and update relationship metrics
       await this.calculateRelationshipMetrics(contact.id);

@@ -111,6 +111,8 @@ export const insertContactLogSchema = createInsertSchema(contactLogs).omit({
     }
     return val || null;
   }),
+  // Add resetReminder flag for mark as attended functionality
+  resetReminder: z.boolean().optional(),
 });
 
 // Response types for API
