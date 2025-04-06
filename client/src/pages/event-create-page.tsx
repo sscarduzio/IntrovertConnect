@@ -81,7 +81,7 @@ export default function EventCreatePage() {
   // Use useRoute hook to properly extract parameters from URL
   const [match, params] = useRoute('/events/:id/edit');
   console.log("Route match:", match, "Params:", params);
-  
+
   // Get eventId from route params if in edit mode
   const eventId = match && params?.id ? parseInt(params.id) : -1;
   console.log("Extracted event ID:", eventId);
@@ -111,42 +111,42 @@ export default function EventCreatePage() {
       reminderMinutes: 30,
     },
   });
-  
+
   // Update form when event data is loaded
   useEffect(() => {
     console.log("useEffect triggered with eventData:", eventData);
-    
+
     if (eventData) {
       console.log("Setting edit mode with data:", eventData);
       setIsEditMode(true);
       setPageTitle("Edit Event");
       setSubmitButtonText("Update Event");
-      
+
       // Format times for form - using defensive checks for date parsing
       try {
         // Helper function to safely parse dates
         const parseDate = (dateValue: any): Date => {
           if (!dateValue) return new Date();
-          
+
           // If it's a string, parse it
           if (typeof dateValue === 'string') {
             const parsedDate = new Date(dateValue);
             return !isNaN(parsedDate.getTime()) ? parsedDate : new Date();
           }
-          
+
           // If it's already a Date object
           if (dateValue instanceof Date) {
             return !isNaN(dateValue.getTime()) ? dateValue : new Date();
           }
-          
+
           // Default fallback
           return new Date();
         };
-        
+
         // Ensure startDate and endDate are valid dates
         const startDate = parseDate(eventData.startDate);
         const endDate = parseDate(eventData.endDate);
-        
+
         // Make sure the dates are valid
         if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
           console.error("Invalid date format in event data", eventData);
@@ -154,7 +154,7 @@ export default function EventCreatePage() {
           const now = new Date();
           const oneHourLater = new Date(now);
           oneHourLater.setHours(oneHourLater.getHours() + 1);
-          
+
           // Set form with default dates
           form.reset({
             title: eventData.title,
@@ -169,7 +169,7 @@ export default function EventCreatePage() {
           });
           return;
         }
-        
+
         // Format time string for input
         const formatTimeForInput = (date: Date) => {
           if (!date || isNaN(date.getTime())) {
@@ -179,7 +179,7 @@ export default function EventCreatePage() {
           const minutes = date.getMinutes().toString().padStart(2, '0');
           return `${hours}:${minutes}`;
         };
-        
+
         // Set form values ensuring no null values are passed
         form.reset({
           title: eventData.title,
@@ -207,20 +207,20 @@ export default function EventCreatePage() {
         if (isNaN(startDateTime.getTime())) {
           throw new Error("Invalid start date");
         }
-        
+
         // Handle time parsing safely
         const startTimeParts = formData.startTime.split(':');
         if (startTimeParts.length !== 2) {
           throw new Error("Invalid start time format");
         }
-        
+
         const startHours = parseInt(startTimeParts[0], 10);
         const startMinutes = parseInt(startTimeParts[1], 10);
-        
+
         if (isNaN(startHours) || isNaN(startMinutes)) {
           throw new Error("Invalid start time values");
         }
-        
+
         startDateTime.setHours(startHours, startMinutes, 0, 0);
 
         // Same for end date and time
@@ -228,19 +228,19 @@ export default function EventCreatePage() {
         if (isNaN(endDateTime.getTime())) {
           throw new Error("Invalid end date");
         }
-        
+
         const endTimeParts = formData.endTime.split(':');
         if (endTimeParts.length !== 2) {
           throw new Error("Invalid end time format");
         }
-        
+
         const endHours = parseInt(endTimeParts[0], 10);
         const endMinutes = parseInt(endTimeParts[1], 10);
-        
+
         if (isNaN(endHours) || isNaN(endMinutes)) {
           throw new Error("Invalid end time values");
         }
-        
+
         endDateTime.setHours(endHours, endMinutes, 0, 0);
 
         const eventData = {
@@ -286,20 +286,20 @@ export default function EventCreatePage() {
         if (isNaN(startDateTime.getTime())) {
           throw new Error("Invalid start date");
         }
-        
+
         // Handle time parsing safely
         const startTimeParts = formData.startTime.split(':');
         if (startTimeParts.length !== 2) {
           throw new Error("Invalid start time format");
         }
-        
+
         const startHours = parseInt(startTimeParts[0], 10);
         const startMinutes = parseInt(startTimeParts[1], 10);
-        
+
         if (isNaN(startHours) || isNaN(startMinutes)) {
           throw new Error("Invalid start time values");
         }
-        
+
         startDateTime.setHours(startHours, startMinutes, 0, 0);
 
         // Same for end date and time
@@ -307,19 +307,19 @@ export default function EventCreatePage() {
         if (isNaN(endDateTime.getTime())) {
           throw new Error("Invalid end date");
         }
-        
+
         const endTimeParts = formData.endTime.split(':');
         if (endTimeParts.length !== 2) {
           throw new Error("Invalid end time format");
         }
-        
+
         const endHours = parseInt(endTimeParts[0], 10);
         const endMinutes = parseInt(endTimeParts[1], 10);
-        
+
         if (isNaN(endHours) || isNaN(endMinutes)) {
           throw new Error("Invalid end time values");
         }
-        
+
         endDateTime.setHours(endHours, endMinutes, 0, 0);
 
         const eventDataToUpdate = {
@@ -375,7 +375,7 @@ export default function EventCreatePage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Navbar />
-      
+
       <main className="flex-grow">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-8">
@@ -625,8 +625,8 @@ export default function EventCreatePage() {
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
-                      );
-                    }}
+                      )}
+                    }
                   />
 
                   <div className="flex justify-end space-x-4">
