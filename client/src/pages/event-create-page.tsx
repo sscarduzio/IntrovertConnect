@@ -625,7 +625,8 @@ export default function EventCreatePage() {
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
-                    )}
+                      );
+                    }}
                   />
 
                   <div className="flex justify-end space-x-4">
