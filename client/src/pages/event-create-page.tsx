@@ -78,15 +78,12 @@ export default function EventCreatePage() {
   const [pageTitle, setPageTitle] = useState("Create New Event");
   const [submitButtonText, setSubmitButtonText] = useState("Create Event");
 
-  // Debug the current URL
-  console.log("Current location:", location);
-  
-  // Check if we're in edit mode by looking at the URL pattern
-  const editMatch = location.match(/^\/events\/(\d+)\/edit$/);
-  console.log("Edit match result:", editMatch);
+  // Use useRoute hook to properly extract parameters from URL
+  const [match, params] = useRoute('/events/:id/edit');
+  console.log("Route match:", match, "Params:", params);
   
   // Get eventId from route params if in edit mode
-  const eventId = editMatch ? parseInt(editMatch[1]) : -1;
+  const eventId = match && params?.id ? parseInt(params.id) : -1;
   console.log("Extracted event ID:", eventId);
 
   // Fetch contacts for dropdown
@@ -117,7 +114,10 @@ export default function EventCreatePage() {
   
   // Update form when event data is loaded
   useEffect(() => {
+    console.log("useEffect triggered with eventData:", eventData);
+    
     if (eventData) {
+      console.log("Setting edit mode with data:", eventData);
       setIsEditMode(true);
       setPageTitle("Edit Event");
       setSubmitButtonText("Update Event");
@@ -408,35 +408,42 @@ export default function EventCreatePage() {
                   <FormField
                     control={form.control}
                     name="contactId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contact</FormLabel>
-                        <Select 
-                          onValueChange={(value) => field.onChange(parseInt(value))}
-                          defaultValue={field.value?.toString()}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a contact" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {contacts && contacts.map((contact) => (
-                              <SelectItem 
-                                key={contact.id} 
-                                value={contact.id.toString()}
-                              >
-                                {contact.firstName} {contact.lastName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          The contact you'll be meeting with
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      console.log("Contact field state:", field.value);
+                      return (
+                        <FormItem>
+                          <FormLabel>Contact</FormLabel>
+                          <Select 
+                            onValueChange={(value) => {
+                              console.log("Contact value changed to:", value);
+                              field.onChange(parseInt(value));
+                            }}
+                            value={field.value?.toString() || ""}
+                            defaultValue={field.value?.toString()}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a contact" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {contacts && contacts.map((contact) => (
+                                <SelectItem 
+                                  key={contact.id} 
+                                  value={contact.id.toString()}
+                                >
+                                  {contact.firstName} {contact.lastName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            The contact you'll be meeting with
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -588,33 +595,36 @@ export default function EventCreatePage() {
                   <FormField
                     control={form.control}
                     name="reminderMinutes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Reminder</FormLabel>
-                        <Select 
-                          onValueChange={(value) => field.onChange(parseInt(value))}
-                          defaultValue={field.value?.toString()}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select reminder time" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="0">No reminder</SelectItem>
-                            <SelectItem value="5">5 minutes before</SelectItem>
-                            <SelectItem value="15">15 minutes before</SelectItem>
-                            <SelectItem value="30">30 minutes before</SelectItem>
-                            <SelectItem value="60">1 hour before</SelectItem>
-                            <SelectItem value="120">2 hours before</SelectItem>
-                            <SelectItem value="1440">1 day before</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          When you want to be reminded about this event
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
+                    render={({ field }) => {
+                      console.log("Reminder field state:", field.value);
+                      return (
+                        <FormItem>
+                          <FormLabel>Reminder</FormLabel>
+                          <Select 
+                            onValueChange={(value) => field.onChange(parseInt(value))}
+                            value={field.value?.toString() || ""}
+                            defaultValue={field.value?.toString()}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select reminder time" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="0">No reminder</SelectItem>
+                              <SelectItem value="5">5 minutes before</SelectItem>
+                              <SelectItem value="15">15 minutes before</SelectItem>
+                              <SelectItem value="30">30 minutes before</SelectItem>
+                              <SelectItem value="60">1 hour before</SelectItem>
+                              <SelectItem value="120">2 hours before</SelectItem>
+                              <SelectItem value="1440">1 day before</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            When you want to be reminded about this event
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
                     )}
                   />
 
