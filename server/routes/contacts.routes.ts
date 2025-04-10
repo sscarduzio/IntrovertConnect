@@ -43,18 +43,18 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const contact = await storage.createContact(req.body);
-      
+
       // Handle tags if provided
       if (req.body.tags && Array.isArray(req.body.tags) && req.body.tags.length > 0) {
         for (const tagName of req.body.tags) {
           // Check if tag exists already
           let tag = await storage.getTagByName(tagName, req.user!.id);
-          
+
           // Create tag if it doesn't exist
           if (!tag) {
             tag = await storage.createTag({ name: tagName, userId: req.user!.id });
           }
-          
+
           // Create contact-tag association
           await storage.createContactTag({
             contactId: contact.id,
@@ -62,7 +62,7 @@ router.post(
           });
         }
       }
-      
+
       // Return the complete contact with tags
       const contactWithTags = await storage.getContactById(contact.id);
       res.status(201).json(contactWithTags);
@@ -83,28 +83,28 @@ router.patch(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const contactId = parseInt(req.params.id);
-      
+
       // Validate partial update data
       const validated = insertContactSchema.partial().parse(req.body);
-      
+
       // Update contact
       const updatedContact = await storage.updateContact(contactId, validated);
-      
+
       // Handle tags if provided
       if (req.body.tags && Array.isArray(req.body.tags)) {
         // Remove existing tags
         await storage.deleteContactTagsByContactId(contactId);
-        
+
         // Add new tags
         for (const tagName of req.body.tags) {
           // Check if tag exists already
           let tag = await storage.getTagByName(tagName, req.user!.id);
-          
+
           // Create tag if it doesn't exist
           if (!tag) {
             tag = await storage.createTag({ name: tagName, userId: req.user!.id });
           }
-          
+
           // Create contact-tag association
           await storage.createContactTag({
             contactId: contactId,
@@ -112,7 +112,7 @@ router.patch(
           });
         }
       }
-      
+
       // Return the complete contact with tags
       const contactWithTags = await storage.getContactById(contactId);
       res.json(contactWithTags);
@@ -156,13 +156,13 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const contactId = parseInt(req.params.id);
-      
+
       // Create contact log
       const contactLog = await storage.createContactLog({
         ...req.body,
         contactId,
       });
-      
+
       res.status(201).json(contactLog);
     } catch (error) {
       next(error);
@@ -175,7 +175,7 @@ router.get(
   "/:id/logs",
   ensureAuthenticated,
   ensureOwnership(
-    (id) => storage.getContactById(id),
+    (id) => storage.getContactById(parseInt(id)),
     (contact) => contact.userId
   ),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -184,6 +184,7 @@ router.get(
       const logs = await storage.getContactLogsByContactId(contactId);
       res.json(logs);
     } catch (error) {
+      console.error("Error getting contact logs:", error);
       next(error);
     }
   }

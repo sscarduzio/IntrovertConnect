@@ -9,6 +9,7 @@ export function ensureAuthenticated(req: Request, res: Response, next: NextFunct
   if (req.isAuthenticated()) {
     return next();
   }
+  console.log("Unauthorized access attempt:", req.url, "User:", req.user);
   res.status(401).send("Unauthorized");
 }
 

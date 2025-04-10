@@ -9,6 +9,7 @@ import eventsRoutes from "./events.routes";
 import dashboardRoutes from "./dashboard.routes";
 import remindersRoutes from "./reminders.routes";
 import userRoutes from "./user.routes";
+import { ensureAuthenticated } from "../middleware/auth";
 
 /**
  * Registers all API routes with the Express app
@@ -18,7 +19,7 @@ import userRoutes from "./user.routes";
 export function registerRoutes(app: Express): Server {
   // Set up authentication first
   setupAuth(app);
-  
+
   // Register all route modules with their respective prefixes
   app.use("/api/contacts", contactsRoutes);
   app.use("/api/tags", tagsRoutes);
@@ -26,7 +27,12 @@ export function registerRoutes(app: Express): Server {
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/reminders", remindersRoutes);
   app.use("/api/user", userRoutes);
-  
+
+  // Test authentication route
+  app.get("/api/auth-test", ensureAuthenticated, (req, res) => {
+    res.json({ success: true, message: "You are authenticated", user: req.user });
+  });
+
   // Create and return the HTTP server
   const httpServer = createServer(app);
   return httpServer;

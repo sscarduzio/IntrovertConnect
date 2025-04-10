@@ -66,8 +66,10 @@ app.use((req, res, next) => {
   const port = 5000;
   server.listen({
     port,
-    host: "localhost",
+    host: "0.0.0.0",  // Use 0.0.0.0 to allow external connections
   }, () => {
     log(`serving on port ${port}`);
+    log(`Server environment: ${app.get("env")}`);
+    log(`API routes available at: http://localhost:${port}/api/`);
   });
 })();
