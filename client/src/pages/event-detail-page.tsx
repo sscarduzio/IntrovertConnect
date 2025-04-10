@@ -552,13 +552,14 @@ export default function EventDetailPage() {
             </DialogHeader>
             
             <div className="py-4 space-y-4">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="font-medium">Contacts who attended:</Label>
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                <Label className="font-medium text-base">Contacts who attended:</Label>
+                <div className="flex items-center gap-3">
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => toggleAllContacts(true)}
+                    className="px-4 rounded-md"
                   >
                     Select All
                   </Button>
@@ -566,6 +567,7 @@ export default function EventDetailPage() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => toggleAllContacts(false)}
+                    className="px-4 rounded-md"
                   >
                     Deselect All
                   </Button>
@@ -614,16 +616,17 @@ export default function EventDetailPage() {
               </div>
             </div>
             
-            <DialogFooter>
+            <DialogFooter className="gap-3 sm:gap-4 mt-6">
               <Button 
                 variant="outline" 
                 onClick={() => setMarkAttendedDialogOpen(false)}
+                className="min-w-[100px]"
               >
                 Cancel
               </Button>
               <Button 
                 onClick={markEventAttended}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 min-w-[150px]"
                 disabled={!Object.values(selectedContacts).some(Boolean)}
               >
                 Confirm Attendance

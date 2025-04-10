@@ -34,12 +34,12 @@ export function ContactDetailsModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      
+
       toast({
         title: "Contact deleted",
         description: "Contact has been deleted successfully",
       });
-      
+
       onClose();
     },
     onError: (error: Error) => {
@@ -77,17 +77,17 @@ export function ContactDetailsModal({
       "bg-pink-500", "bg-yellow-500", "bg-red-500", 
       "bg-indigo-500", "bg-teal-500"
     ];
-    
+
     const hash = name.split('').reduce((acc, char) => {
       return char.charCodeAt(0) + acc;
     }, 0);
-    
+
     return colors[hash % colors.length];
   };
 
   const avatarColor = getAvatarColor(`${contact.firstName} ${contact.lastName}`);
   const initials = getInitials(`${contact.firstName} ${contact.lastName}`);
-  
+
   // Get formatted reminder frequency
   const getReminderFrequency = (months: number): string => {
     switch(months) {
@@ -153,7 +153,7 @@ export function ContactDetailsModal({
           <DialogHeader>
             <DialogTitle className="flex justify-between items-center">
               <span>Contact Details</span>
-              <div className="flex space-x-2">
+              <div className="flex space-x-4"> {/* Increased spacing between buttons */}
                 <Button 
                   size="icon" 
                   variant="outline" 
@@ -173,7 +173,7 @@ export function ContactDetailsModal({
               </div>
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="py-4">
             <div className="flex items-center">
               <div className={`h-16 w-16 rounded-full text-white flex items-center justify-center ${avatarColor}`}>
@@ -192,7 +192,7 @@ export function ContactDetailsModal({
                 </div>
               </div>
             </div>
-            
+
             <div className="mt-6 border-t border-gray-200 pt-4">
               <dl className="divide-y divide-gray-200">
                 {contact.email && (
@@ -204,7 +204,7 @@ export function ContactDetailsModal({
                     <dd className="text-gray-900 truncate">{contact.email}</dd>
                   </div>
                 )}
-                
+
                 {contact.phone && (
                   <div className="py-3 flex justify-between text-sm">
                     <dt className="text-gray-500 flex items-center">
@@ -214,7 +214,7 @@ export function ContactDetailsModal({
                     <dd className="text-gray-900">{contact.phone}</dd>
                   </div>
                 )}
-                
+
                 <div className="py-3 flex justify-between text-sm">
                   <dt className="text-gray-500 flex items-center">
                     <Calendar className="h-4 w-4 mr-2" />
@@ -224,7 +224,7 @@ export function ContactDetailsModal({
                     {formatDate(contact.lastContactDate)}
                   </dd>
                 </div>
-                
+
                 <div className="py-3 flex justify-between text-sm">
                   <dt className="text-gray-500 flex items-center">
                     <Clock className="h-4 w-4 mr-2" />
@@ -234,7 +234,7 @@ export function ContactDetailsModal({
                     {getReminderFrequency(contact.reminderFrequency)}
                   </dd>
                 </div>
-                
+
                 <div className="py-3 flex justify-between text-sm">
                   <dt className="text-gray-500 flex items-center">
                     <Calendar className="h-4 w-4 mr-2" />
@@ -251,7 +251,7 @@ export function ContactDetailsModal({
                 </div>
               </dl>
             </div>
-            
+
             {contact.notes && (
               <div className="mt-4">
                 <h4 className="text-sm font-medium text-gray-500 flex items-center">
@@ -263,13 +263,13 @@ export function ContactDetailsModal({
                 </div>
               </div>
             )}
-            
+
             <div className="mt-5 border-t border-gray-200 pt-4">
               <h4 className="text-sm font-medium text-gray-500 flex items-center">
                 <Calendar className="h-4 w-4 mr-2" />
                 Contact History
               </h4>
-              
+
               {contact.logs && contact.logs.length > 0 ? (
                 <ul className="mt-2 divide-y divide-gray-200">
                   {contact.logs.map((log) => (
@@ -296,7 +296,7 @@ export function ContactDetailsModal({
               )}
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button 
               variant="outline" 
@@ -314,7 +314,7 @@ export function ContactDetailsModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
