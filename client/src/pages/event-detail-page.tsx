@@ -157,6 +157,7 @@ export default function EventDetailPage() {
       // Create an array of promises for each contact log creation
       const promises = selectedContactIds.map(contactId => {
         const contactLogData = {
+          contactId: contactId,
           contactDate: event.startDate,
           contactType: "event",
           notes: `Attended event: ${event.title}`,
