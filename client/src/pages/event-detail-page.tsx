@@ -122,37 +122,65 @@ export default function EventDetailPage() {
     setDeleteDialogOpen(false);
   };
   
+  // State for tracking selected contacts for attendance
+  const [selectedContacts, setSelectedContacts] = useState<{[id: number]: boolean}>({});
+  
+  // Initialize all contacts as selected when dialog opens
+  useEffect(() => {
+    if (event?.contacts && markAttendedDialogOpen) {
+      const initialSelections = event.contacts.reduce((acc, contact) => {
+        acc[contact.id] = true; // Default all contacts to selected
+        return acc;
+      }, {} as {[id: number]: boolean});
+      
+      setSelectedContacts(initialSelections);
+    }
+  }, [event?.contacts, markAttendedDialogOpen]);
+  
   // Mark event as attended mutation
   const markAttendedMutation = useMutation({
     mutationFn: async () => {
-      if (!event || !selectedContactId) {
-        throw new Error("Event or contact data not available");
+      if (!event) {
+        throw new Error("Event data not available");
       }
       
-      const contactLogData = {
-        contactDate: event.startDate, // Use the direct ISO string from the event
-        contactType: "event",
-        notes: `Attended event: ${event.title}`,
-        resetReminder: resetReminder,
-      };
+      // Get all selected contact IDs
+      const selectedContactIds = Object.entries(selectedContacts)
+        .filter(([_, isSelected]) => isSelected)
+        .map(([id]) => parseInt(id));
       
-      const res = await apiRequest("POST", `/api/contacts/${selectedContactId}/logs`, contactLogData);
-      return await res.json();
+      if (selectedContactIds.length === 0) {
+        throw new Error("No contacts selected");
+      }
+      
+      // Create an array of promises for each contact log creation
+      const promises = selectedContactIds.map(contactId => {
+        const contactLogData = {
+          contactDate: event.startDate,
+          contactType: "event",
+          notes: `Attended event: ${event.title}`,
+          resetReminder: resetReminder,
+        };
+        
+        return apiRequest("POST", `/api/contacts/${contactId}/logs`, contactLogData);
+      });
+      
+      // Execute all requests concurrently
+      const results = await Promise.all(promises);
+      return results;
     },
     onSuccess: () => {
-      if (!selectedContactId || !event?.contacts) return;
+      if (!event?.contacts) return;
       
-      // Find the selected contact
-      const selectedContact = event.contacts.find(c => c.id === selectedContactId);
+      // Count how many contacts were updated
+      const updatedCount = Object.values(selectedContacts).filter(Boolean).length;
       
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       
       toast({
         title: "Event marked as attended",
-        description: resetReminder 
-          ? `Contact with ${selectedContact?.firstName} has been logged and reminder has been reset.`
-          : `Contact with ${selectedContact?.firstName} has been logged without changing the reminder schedule.`,
+        description: `Attendance recorded for ${updatedCount} contact${updatedCount !== 1 ? 's' : ''}.`,
       });
       
       setMarkAttendedDialogOpen(false);
@@ -168,6 +196,26 @@ export default function EventDetailPage() {
   
   const markEventAttended = () => {
     markAttendedMutation.mutate();
+  };
+  
+  // Toggle selection for a specific contact
+  const toggleContactSelection = (contactId: number) => {
+    setSelectedContacts(prev => ({
+      ...prev,
+      [contactId]: !prev[contactId]
+    }));
+  };
+  
+  // Toggle all contacts selection
+  const toggleAllContacts = (selectAll: boolean) => {
+    if (!event?.contacts) return;
+    
+    const newSelections = event.contacts.reduce((acc, contact) => {
+      acc[contact.id] = selectAll;
+      return acc;
+    }, {} as {[id: number]: boolean});
+    
+    setSelectedContacts(newSelections);
   };
 
   // Loading state
@@ -502,53 +550,66 @@ export default function EventDetailPage() {
             </DialogHeader>
             
             <div className="py-4 space-y-4">
-              {event.contacts.length > 1 && (
-                <div className="flex flex-col gap-2">
-                  <Label>Select a contact for this attendance record:</Label>
-                  <Select
-                    onValueChange={(value) => setSelectedContactId(parseInt(value))}
-                    value={selectedContactId?.toString()}
+              <div className="flex items-center justify-between mb-2">
+                <Label className="font-medium">Contacts who attended:</Label>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => toggleAllContacts(true)}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a contact" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {event.contacts.map(contact => (
-                        <SelectItem key={contact.id} value={contact.id.toString()}>
-                          {contact.firstName} {contact.lastName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    Select All
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => toggleAllContacts(false)}
+                  >
+                    Deselect All
+                  </Button>
                 </div>
-              )}
+              </div>
               
-              {selectedContactId && (
-                <>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="reset-reminder"
-                      checked={resetReminder}
-                      onCheckedChange={setResetReminder}
+              <div className="max-h-[200px] overflow-y-auto border rounded-md p-2">
+                {event.contacts.map(contact => (
+                  <div key={contact.id} className="flex items-center space-x-2 py-2 border-b last:border-0">
+                    <Checkbox 
+                      id={`contact-${contact.id}`}
+                      checked={selectedContacts[contact.id] || false}
+                      onCheckedChange={() => toggleContactSelection(contact.id)}
                     />
-                    <Label htmlFor="reset-reminder" className="text-sm">
-                      Reset the reminder for {event.contacts.find(c => c.id === selectedContactId)?.firstName}
+                    <Label 
+                      htmlFor={`contact-${contact.id}`}
+                      className="flex-1 cursor-pointer"
+                    >
+                      {contact.firstName} {contact.lastName}
                     </Label>
                   </div>
-                  
-                  <div className="text-sm text-gray-500">
-                    {resetReminder ? (
-                      <p>
-                        The next contact reminder will be reset to the contact's reminder frequency from today.
-                      </p>
-                    ) : (
-                      <p>
-                        The existing contact reminder will remain unchanged.
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
+                ))}
+              </div>
+              
+              <div className="flex items-center space-x-2 pt-2">
+                <Switch
+                  id="reset-reminder"
+                  checked={resetReminder}
+                  onCheckedChange={setResetReminder}
+                />
+                <Label htmlFor="reset-reminder" className="text-sm">
+                  Reset the reminder for selected contacts
+                </Label>
+              </div>
+              
+              <div className="text-sm text-gray-500">
+                {resetReminder ? (
+                  <p>
+                    The next contact reminder will be reset to each contact's reminder frequency from today.
+                  </p>
+                ) : (
+                  <p>
+                    The existing contact reminders will remain unchanged.
+                  </p>
+                )}
+              </div>
             </div>
             
             <DialogFooter>
@@ -561,7 +622,7 @@ export default function EventDetailPage() {
               <Button 
                 onClick={markEventAttended}
                 className="bg-green-600 hover:bg-green-700"
-                disabled={!selectedContactId}
+                disabled={!Object.values(selectedContacts).some(Boolean)}
               >
                 Confirm Attendance
               </Button>
