@@ -4,7 +4,7 @@
 
 IntroConnect is a sophisticated contact management platform specifically designed for introverts to help maintain relationships with minimal social anxiety. It provides intelligent reminders, relationship health tracking, and advanced organization tools to make staying in touch less overwhelming.
 
-![IntroConnect Dashboard](attached_assets/image_1743798024901.png)
+![IntroConnect Dashboard](attached_assets/introconnect.png)
 
 ## 🌟 Features
 
@@ -27,10 +27,81 @@ Create a `.env` file in the root directory with the following variables:
 DATABASE_URL=postgresql://username:password@localhost:5432/introconnect
 
 # Session
-SESSION_SECRET=your_session_secret_here
+SESSION_SECRET=your_session_secret
 
 # Email (optional)
 SENDGRID_API_KEY=your_sendgrid_api_key
+```
+
+## 🚀 Development Setup
+
+### Prerequisites
+- Node.js (v16+)
+- Docker and Docker Compose
+
+### Running Locally
+
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Start the PostgreSQL database**
+   ```bash
+   docker-compose up -d db
+   ```
+
+   > **Note**: The Docker configuration uses `POSTGRES_HOST_AUTH_METHOD=trust` for easier local development.
+
+3. **Set up environment variables (Optional)**
+   The default configuration should work out of the box, but if you need to customize:
+   ```
+   # Database (Optional - hardcoded defaults used by server/db.ts)
+   DATABASE_URL=postgres://postgres:postgres@localhost:5432/introconnect
+   
+   # Session
+   SESSION_SECRET=dev_session_secret
+   
+   # For development (prevents email errors)
+   SENDGRID_API_KEY=SG.dummy_key_for_dev
+   ```
+
+4. **Run database migrations**
+   ```bash
+   npm run db:push
+   ```
+
+5. **Start the development server**
+   ```bash
+   npm run dev
+   ```
+
+6. **Access the application**
+   Open your browser and navigate to: http://localhost:3000
+
+### Troubleshooting Database Connection
+The application will use the `DATABASE_URL` environment variable if available. If not, it falls back to hardcoded development credentials:
+
+```javascript
+// If DATABASE_URL is defined, it uses that
+// Otherwise it falls back to these parameters:
+{
+  host: 'localhost',
+  port: 5432,
+  database: 'introconnect',
+  user: 'postgres',
+  password: 'postgres'
+}
+```
+
+If you experience database connection issues like `SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string`, try setting the `DATABASE_URL` directly in your environment or add it to your `.env` file with one of these formats:
+
+```
+# Option 1
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/introconnect
+
+# Option 2
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/introconnect
 ```
 
 ## 📊 Database Schema

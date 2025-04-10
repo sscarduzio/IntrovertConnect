@@ -1,8 +1,9 @@
 import { 
-  users, contacts, tags, contactTags, contactLogs, calendarEvents,
+  users, contacts, tags, contactTags, contactLogs, calendarEvents, eventContacts,
   User, InsertUser, Contact, InsertContact, Tag, InsertTag, 
   ContactTag, InsertContactTag, ContactLog, InsertContactLog, 
-  ContactWithTags, ContactWithLogsAndTags, CalendarEvent, InsertCalendarEvent 
+  ContactWithTags, ContactWithLogsAndTags, CalendarEvent, InsertCalendarEvent,
+  EventContact, InsertEventContact, CalendarEventWithContacts
 } from "@shared/schema";
 import { db, pool } from "./db";
 import connectPg from "connect-pg-simple";
@@ -42,18 +43,24 @@ export interface IStorage {
   createContactLog(contactLog: InsertContactLog): Promise<ContactLog>;
   
   // Calendar Event methods
-  getCalendarEventsByUserId(userId: number): Promise<CalendarEvent[]>;
-  getCalendarEventsByContactId(contactId: number): Promise<CalendarEvent[]>;
-  getCalendarEvent(id: number): Promise<CalendarEvent | undefined>;
-  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
-  updateCalendarEvent(id: number, event: Partial<InsertCalendarEvent>): Promise<CalendarEvent | undefined>;
+  getCalendarEventsByUserId(userId: number): Promise<CalendarEventWithContacts[]>;
+  getCalendarEventsByContactId(contactId: number): Promise<CalendarEventWithContacts[]>;
+  getCalendarEvent(id: number): Promise<CalendarEventWithContacts | undefined>;
+  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEventWithContacts>;
+  updateCalendarEvent(id: number, event: Partial<InsertCalendarEvent>): Promise<CalendarEventWithContacts | undefined>;
   deleteCalendarEvent(id: number): Promise<boolean>;
+  
+  // Event Contact methods
+  getContactsByEventId(eventId: number): Promise<Contact[]>;
+  getEventsByContactId(contactId: number): Promise<CalendarEvent[]>;
+  addContactToEvent(eventId: number, contactId: number): Promise<EventContact>;
+  removeContactFromEvent(eventId: number, contactId: number): Promise<boolean>;
   
   // Dashboard data
   getDueContacts(userId: number): Promise<ContactWithTags[]>;
   getRecentContacts(userId: number, limit: number): Promise<ContactWithTags[]>;
   getPopularTags(userId: number, limit: number): Promise<{tag: Tag, count: number}[]>;
-  getUpcomingEvents(userId: number, limit: number): Promise<CalendarEvent[]>;
+  getUpcomingEvents(userId: number, limit: number): Promise<CalendarEventWithContacts[]>;
   
   // Session store for auth
   sessionStore: any;
@@ -202,8 +209,12 @@ export class DatabaseStorage implements IStorage {
     // Delete associated contact tags
     await db.delete(contactTags).where(eq(contactTags.contactId, id));
     
-    // Delete associated calendar events
-    await db.delete(calendarEvents).where(eq(calendarEvents.contactId, id));
+    // Get associated events 
+    const eventContactsResult = await db.select().from(eventContacts).where(eq(eventContacts.contactId, id));
+    const eventIds = eventContactsResult.map(ec => ec.eventId);
+    
+    // Delete associated event contacts
+    await db.delete(eventContacts).where(eq(eventContacts.contactId, id));
     
     // Delete the contact
     const result = await db.delete(contacts).where(eq(contacts.id, id)).returning();
@@ -430,57 +441,224 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Calendar Event methods
-  async getCalendarEventsByUserId(userId: number): Promise<CalendarEvent[]> {
-    return await db
+  async getCalendarEventsByUserId(userId: number): Promise<CalendarEventWithContacts[]> {
+    const events = await db
       .select()
       .from(calendarEvents)
       .where(eq(calendarEvents.userId, userId))
       .orderBy(calendarEvents.startDate);
+      
+    return await this.hydrateEventsWithContacts(events);
   }
 
-  async getCalendarEventsByContactId(contactId: number): Promise<CalendarEvent[]> {
-    return await db
+  async getCalendarEventsByContactId(contactId: number): Promise<CalendarEventWithContacts[]> {
+    // Get event IDs that have this contact
+    const eventContactsResult = await db
+      .select()
+      .from(eventContacts)
+      .where(eq(eventContacts.contactId, contactId));
+      
+    if (eventContactsResult.length === 0) {
+      return [];
+    }
+    
+    const eventIds = eventContactsResult.map(ec => ec.eventId);
+    
+    // Get full event data
+    const events = await db
       .select()
       .from(calendarEvents)
-      .where(eq(calendarEvents.contactId, contactId))
+      .where(inArray(calendarEvents.id, eventIds))
       .orderBy(calendarEvents.startDate);
+      
+    return await this.hydrateEventsWithContacts(events);
   }
 
-  async getCalendarEvent(id: number): Promise<CalendarEvent | undefined> {
+  async getCalendarEvent(id: number): Promise<CalendarEventWithContacts | undefined> {
     const [event] = await db
       .select()
       .from(calendarEvents)
       .where(eq(calendarEvents.id, id));
       
-    return event;
-  }
-
-  async createCalendarEvent(eventData: InsertCalendarEvent): Promise<CalendarEvent> {
-    const [event] = await db.insert(calendarEvents).values(eventData).returning();
-    return event;
-  }
-
-  async updateCalendarEvent(id: number, eventData: Partial<InsertCalendarEvent>): Promise<CalendarEvent | undefined> {
-    if (Object.keys(eventData).length === 0) {
-      return this.getCalendarEvent(id);
+    if (!event) {
+      return undefined;
     }
     
-    const [updatedEvent] = await db
-      .update(calendarEvents)
-      .set(eventData)
-      .where(eq(calendarEvents.id, id))
-      .returning();
+    const [eventWithContacts] = await this.hydrateEventsWithContacts([event]);
+    return eventWithContacts;
+  }
+
+  async createCalendarEvent(eventData: InsertCalendarEvent): Promise<CalendarEventWithContacts> {
+    // Extract contactIds from eventData
+    const { contactIds, ...calendarEventData } = eventData;
+    
+    // Create the event without contacts
+    const [event] = await db.insert(calendarEvents).values(calendarEventData).returning();
+    
+    // Add all contacts to the event
+    for (const contactId of contactIds) {
+      await this.addContactToEvent(event.id, contactId);
+    }
+    
+    // Return the event with hydrated contacts
+    return await this.getCalendarEvent(event.id) as CalendarEventWithContacts;
+  }
+
+  async updateCalendarEvent(id: number, eventData: Partial<InsertCalendarEvent>): Promise<CalendarEventWithContacts | undefined> {
+    // Extract contactIds if present
+    const { contactIds, ...calendarEventData } = eventData;
+    
+    if (Object.keys(calendarEventData).length > 0) {
+      // Update the event data
+      await db
+        .update(calendarEvents)
+        .set(calendarEventData)
+        .where(eq(calendarEvents.id, id));
+    }
+    
+    // If contactIds is provided, update the event-contact relationships
+    if (contactIds) {
+      // Delete existing relationships
+      await db.delete(eventContacts).where(eq(eventContacts.eventId, id));
       
-    return updatedEvent;
+      // Add new relationships
+      for (const contactId of contactIds) {
+        await this.addContactToEvent(id, contactId);
+      }
+    }
+    
+    // Return the updated event with hydrated contacts
+    return await this.getCalendarEvent(id);
   }
 
   async deleteCalendarEvent(id: number): Promise<boolean> {
+    // Delete event-contact relationships first
+    await db.delete(eventContacts).where(eq(eventContacts.eventId, id));
+    
+    // Delete the event
     const result = await db
       .delete(calendarEvents)
       .where(eq(calendarEvents.id, id))
       .returning();
       
     return result.length > 0;
+  }
+  
+  // Event Contact methods
+  async getContactsByEventId(eventId: number): Promise<Contact[]> {
+    const eventContactsResult = await db
+      .select()
+      .from(eventContacts)
+      .where(eq(eventContacts.eventId, eventId));
+      
+    if (eventContactsResult.length === 0) {
+      return [];
+    }
+    
+    // Get all contact IDs
+    const contactIds = Array.from(new Set(eventContactsResult.map(ec => ec.contactId)));
+    
+    return await db
+      .select()
+      .from(contacts)
+      .where(inArray(contacts.id, contactIds));
+  }
+  
+  async getEventsByContactId(contactId: number): Promise<CalendarEvent[]> {
+    const eventContactsResult = await db
+      .select()
+      .from(eventContacts)
+      .where(eq(eventContacts.contactId, contactId));
+      
+    if (eventContactsResult.length === 0) {
+      return [];
+    }
+    
+    const eventIds = eventContactsResult.map(ec => ec.eventId);
+    
+    return await db
+      .select()
+      .from(calendarEvents)
+      .where(inArray(calendarEvents.id, eventIds))
+      .orderBy(calendarEvents.startDate);
+  }
+  
+  async addContactToEvent(eventId: number, contactId: number): Promise<EventContact> {
+    // Check if it already exists
+    const [existing] = await db
+      .select()
+      .from(eventContacts)
+      .where(and(
+        eq(eventContacts.eventId, eventId),
+        eq(eventContacts.contactId, contactId)
+      ));
+      
+    if (existing) {
+      return existing;
+    }
+    
+    // Add the new relationship
+    const [eventContact] = await db
+      .insert(eventContacts)
+      .values({ eventId, contactId })
+      .returning();
+      
+    return eventContact;
+  }
+  
+  async removeContactFromEvent(eventId: number, contactId: number): Promise<boolean> {
+    const result = await db
+      .delete(eventContacts)
+      .where(and(
+        eq(eventContacts.eventId, eventId),
+        eq(eventContacts.contactId, contactId)
+      ))
+      .returning();
+      
+    return result.length > 0;
+  }
+  
+  // Helper method to hydrate events with their contacts
+  private async hydrateEventsWithContacts(events: CalendarEvent[]): Promise<CalendarEventWithContacts[]> {
+    if (events.length === 0) {
+      return [];
+    }
+    
+    const eventIds = events.map(e => e.id);
+    
+    // Get all event-contact relationships for these events
+    const eventContactsResult = await db
+      .select()
+      .from(eventContacts)
+      .where(inArray(eventContacts.eventId, eventIds));
+      
+    // Get all contact IDs
+    const contactIds = Array.from(new Set(eventContactsResult.map(ec => ec.contactId)));
+    
+    // If no contacts, return events with empty contacts array
+    if (contactIds.length === 0) {
+      return events.map(event => ({ ...event, contacts: [] }));
+    }
+    
+    // Get all contacts
+    const contactsResult = await db
+      .select()
+      .from(contacts)
+      .where(inArray(contacts.id, contactIds));
+    
+    // Map events to include their contacts
+    return events.map(event => {
+      const eventContactIds = eventContactsResult
+        .filter(ec => ec.eventId === event.id)
+        .map(ec => ec.contactId);
+        
+      const eventContacts = contactsResult.filter(contact => eventContactIds.includes(contact.id));
+      
+      return {
+        ...event,
+        contacts: eventContacts
+      };
+    });
   }
 
   // Dashboard data methods
@@ -531,10 +709,10 @@ export class DatabaseStorage implements IStorage {
       .slice(0, limit);
   }
 
-  async getUpcomingEvents(userId: number, limit: number): Promise<CalendarEvent[]> {
+  async getUpcomingEvents(userId: number, limit: number): Promise<CalendarEventWithContacts[]> {
     const now = new Date();
     
-    return await db
+    const events = await db
       .select()
       .from(calendarEvents)
       .where(and(
@@ -543,6 +721,8 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(calendarEvents.startDate)
       .limit(limit);
+      
+    return await this.hydrateEventsWithContacts(events);
   }
 }
 

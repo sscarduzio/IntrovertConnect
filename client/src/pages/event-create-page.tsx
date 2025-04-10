@@ -5,10 +5,10 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { Loader2, CalendarIcon, Clock } from "lucide-react";
+import { Loader2, CalendarIcon, Clock, X, Check } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { insertCalendarEventSchema, ContactWithTags, CalendarEvent } from "@shared/schema";
+import { insertCalendarEventSchema, ContactWithTags, CalendarEvent, CalendarEventWithContacts } from "@shared/schema";
 import Navbar from "@/components/navbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -33,14 +40,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
 
 const eventFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional().default(""),
   location: z.string().optional().default(""),
-  contactId: z.number({
-    required_error: "Contact is required"
-  }),
+  contactIds: z.array(z.number()).min(1, "At least one contact is required"),
   reminderMinutes: z.number().nullable().optional(),
   startDate: z.date({
     required_error: "Start date is required",
@@ -86,16 +92,73 @@ export default function EventCreatePage() {
   const eventId = match && params?.id ? parseInt(params.id) : -1;
   console.log("Extracted event ID:", eventId);
 
+  // Check URL directly as a fallback if useRoute doesn't match
+  useEffect(() => {
+    if (eventId === -1 && window.location.pathname.includes('/edit')) {
+      // Extract ID from URL pattern /events/{id}/edit
+      const urlParts = window.location.pathname.split('/');
+      const idFromUrl = urlParts[urlParts.indexOf('events') + 1];
+      
+      if (idFromUrl && !isNaN(parseInt(idFromUrl))) {
+        console.log("ID extracted from URL:", idFromUrl);
+        // Redirect to the same URL but with the correct route structure
+        navigate(`/events/${idFromUrl}/edit`, { replace: true });
+      }
+    }
+  }, [eventId, navigate]);
+
   // Fetch contacts for dropdown
   const { data: contacts, isLoading: contactsLoading } = useQuery<ContactWithTags[]>({
     queryKey: ["/api/contacts"],
   });
 
   // Fetch event details if in edit mode
-  const { data: eventData, isLoading: eventLoading } = useQuery<CalendarEvent>({
+  const { data: eventData, isLoading: eventLoading, error: eventError } = useQuery({
     queryKey: ['/api/events', eventId],
+    queryFn: async () => {
+      try {
+        console.log("Fetching event data for ID:", eventId);
+        const response = await apiRequest('GET', `/api/events/${eventId}`);
+        console.log("API Response:", response);
+        
+        if (!response.ok) {
+          throw new Error(`API returned status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log("Raw event data from API:", data);
+        
+        // Log fields we expect to use
+        if (data) {
+          console.log("Event title:", data.title);
+          console.log("Event contacts:", data.contacts);
+          console.log("Start date:", data.startDate);
+          console.log("End date:", data.endDate);
+        }
+        
+        return data as CalendarEventWithContacts;
+      } catch (error) {
+        console.error("Error fetching event data:", error);
+        throw error;
+      }
+    },
     enabled: eventId > 0,
+    refetchOnMount: true,
+    staleTime: 0, // Force a fresh fetch
+    gcTime: 0     // Don't keep the data in cache
   });
+
+  // Log any event error
+  useEffect(() => {
+    if (eventError) {
+      console.error("Event query error:", eventError);
+      toast({
+        title: "Error loading event",
+        description: "Could not load event data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [eventError, toast]);
 
   // Form setup
   const form = useForm<EventFormValues>({
@@ -109,6 +172,7 @@ export default function EventCreatePage() {
       startTime: "09:00",
       endTime: "10:00",
       reminderMinutes: 30,
+      contactIds: [],
     },
   });
 
@@ -160,7 +224,7 @@ export default function EventCreatePage() {
             title: eventData.title,
             description: eventData.description || "",
             location: eventData.location || "",
-            contactId: eventData.contactId,
+            contactIds: Array.isArray(eventData.contacts) ? eventData.contacts.map(contact => contact.id) : [],
             startDate: now,
             endDate: oneHourLater,
             startTime: "09:00",
@@ -185,7 +249,7 @@ export default function EventCreatePage() {
           title: eventData.title,
           description: eventData.description || "",
           location: eventData.location || "",
-          contactId: eventData.contactId,
+          contactIds: Array.isArray(eventData.contacts) ? eventData.contacts.map(contact => contact.id) : [],
           startDate: startDate,
           endDate: endDate,
           startTime: formatTimeForInput(startDate),
@@ -252,6 +316,11 @@ export default function EventCreatePage() {
         // Remove form-specific fields
         delete (eventData as any).startTime;
         delete (eventData as any).endTime;
+
+        // Ensure contactIds is an array with at least one ID
+        if (!eventData.contactIds || !eventData.contactIds.length) {
+          throw new Error("At least one contact is required");
+        }
 
         const res = await apiRequest("POST", "/api/events", eventData);
         return await res.json();
@@ -331,6 +400,11 @@ export default function EventCreatePage() {
         // Remove form-specific fields
         delete (eventDataToUpdate as any).startTime;
         delete (eventDataToUpdate as any).endTime;
+        
+        // Ensure contactIds is an array with at least one ID
+        if (!eventDataToUpdate.contactIds || !eventDataToUpdate.contactIds.length) {
+          throw new Error("At least one contact is required");
+        }
 
         const res = await apiRequest("PATCH", `/api/events/${eventId}`, eventDataToUpdate);
         return await res.json();
@@ -407,38 +481,86 @@ export default function EventCreatePage() {
 
                   <FormField
                     control={form.control}
-                    name="contactId"
+                    name="contactIds"
                     render={({ field }) => {
-                      console.log("Contact field state:", field.value);
+                      const selectedContacts = contacts?.filter(contact => 
+                        field.value.includes(contact.id)
+                      ) || [];
+                      
                       return (
-                        <FormItem>
-                          <FormLabel>Contact</FormLabel>
-                          <Select 
-                            onValueChange={(value) => {
-                              console.log("Contact value changed to:", value);
-                              field.onChange(parseInt(value));
-                            }}
-                            value={field.value?.toString() || ""}
-                            defaultValue={field.value?.toString()}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a contact" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {contacts && contacts.map((contact) => (
-                                <SelectItem 
-                                  key={contact.id} 
-                                  value={contact.id.toString()}
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Contacts</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={`w-full justify-between ${!field.value.length ? "text-muted-foreground" : ""}`}
+                                >
+                                  {field.value.length
+                                    ? `${field.value.length} contact${field.value.length === 1 ? "" : "s"} selected`
+                                    : "Select contacts"}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search contacts..." />
+                                <CommandEmpty>No contacts found.</CommandEmpty>
+                                <CommandGroup>
+                                  {contacts?.map((contact: ContactWithTags) => {
+                                    const isSelected = field.value.includes(contact.id);
+                                    return (
+                                      <CommandItem
+                                        key={contact.id}
+                                        value={contact.id.toString()}
+                                        onSelect={() => {
+                                          if (isSelected) {
+                                            field.onChange(field.value.filter(id => id !== contact.id));
+                                          } else {
+                                            field.onChange([...field.value, contact.id]);
+                                          }
+                                        }}
+                                      >
+                                        <div className="flex items-center">
+                                          {isSelected ? <Check className="mr-2 h-4 w-4" /> : <div className="mr-2 h-4 w-4" />}
+                                          <span>{contact.firstName} {contact.lastName}</span>
+                                        </div>
+                                      </CommandItem>
+                                    );
+                                  })}
+                                </CommandGroup>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          
+                          {selectedContacts.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {selectedContacts.map((contact: ContactWithTags) => (
+                                <Badge 
+                                  key={contact.id}
+                                  variant="secondary"
+                                  className="pl-2"
                                 >
                                   {contact.firstName} {contact.lastName}
-                                </SelectItem>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 w-5 p-0 ml-1"
+                                    onClick={() => {
+                                      field.onChange(field.value.filter(id => id !== contact.id));
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </Badge>
                               ))}
-                            </SelectContent>
-                          </Select>
+                            </div>
+                          )}
+                          
                           <FormDescription>
-                            The contact you'll be meeting with
+                            The contact(s) you'll be meeting with
                           </FormDescription>
                           <FormMessage />
                         </FormItem>

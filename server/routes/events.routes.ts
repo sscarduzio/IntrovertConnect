@@ -49,14 +49,18 @@ router.post(
   extendAndValidate(insertCalendarEventSchema, (req) => ({ userId: req.user!.id })),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Check if contact exists and belongs to user
-      const existingContact = await storage.getContactById(req.body.contactId);
-      if (!existingContact) {
-        return res.status(404).json({ message: "Contact not found" });
-      }
+      // Check if each contact exists and belongs to user
+      const contactIds = req.body.contactIds;
       
-      if (existingContact.userId !== req.user!.id) {
-        return res.status(403).json({ message: "Forbidden" });
+      for (const contactId of contactIds) {
+        const existingContact = await storage.getContactById(contactId);
+        if (!existingContact) {
+          return res.status(404).json({ message: `Contact with ID ${contactId} not found` });
+        }
+        
+        if (existingContact.userId !== req.user!.id) {
+          return res.status(403).json({ message: `You don't have permission to include contact with ID ${contactId}` });
+        }
       }
       
       const event = await storage.createCalendarEvent(req.body);
@@ -83,15 +87,17 @@ router.patch(
       // Validate partial update data
       const validated = insertCalendarEventSchema.partial().parse(req.body);
       
-      // If contactId is being updated, check if the new contact exists and belongs to user
-      if (validated.contactId && validated.contactId !== existingEvent.contactId) {
-        const existingContact = await storage.getContactById(validated.contactId);
-        if (!existingContact) {
-          return res.status(404).json({ message: "Contact not found" });
-        }
-        
-        if (existingContact.userId !== req.user!.id) {
-          return res.status(403).json({ message: "Forbidden" });
+      // If contactIds is being updated, check if the new contacts exist and belong to user
+      if (validated.contactIds) {
+        for (const contactId of validated.contactIds) {
+          const existingContact = await storage.getContactById(contactId);
+          if (!existingContact) {
+            return res.status(404).json({ message: `Contact with ID ${contactId} not found` });
+          }
+          
+          if (existingContact.userId !== req.user!.id) {
+            return res.status(403).json({ message: `You don't have permission to include contact with ID ${contactId}` });
+          }
         }
       }
       
@@ -118,6 +124,80 @@ router.delete(
     try {
       const eventId = parseInt(req.params.id);
       await storage.deleteCalendarEvent(eventId);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Get events for a specific contact
+router.get("/contact/:contactId", ensureAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const contactId = parseInt(req.params.contactId);
+    
+    // Verify contact exists and belongs to current user
+    const contact = await storage.getContactById(contactId);
+    if (!contact) {
+      return res.status(404).json({ message: "Contact not found" });
+    }
+    
+    if (contact.userId !== req.user!.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    const events = await storage.getCalendarEventsByContactId(contactId);
+    res.json(events);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Add a contact to an event
+router.post(
+  "/:id/contacts/:contactId",
+  ensureAuthenticated,
+  ensureOwnership(
+    (id) => storage.getCalendarEvent(id),
+    (event) => event.userId
+  ),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const contactId = parseInt(req.params.contactId);
+      
+      // Verify contact exists and belongs to current user
+      const contact = await storage.getContactById(contactId);
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      
+      if (contact.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const eventContact = await storage.addContactToEvent(eventId, contactId);
+      res.status(201).json(eventContact);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Remove a contact from an event
+router.delete(
+  "/:id/contacts/:contactId",
+  ensureAuthenticated,
+  ensureOwnership(
+    (id) => storage.getCalendarEvent(id),
+    (event) => event.userId
+  ),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const contactId = parseInt(req.params.contactId);
+      
+      await storage.removeContactFromEvent(eventId, contactId);
       res.status(204).send();
     } catch (error) {
       next(error);

@@ -8,6 +8,7 @@ import {
   Clock, 
   MapPin, 
   User, 
+  Users,
   Info, 
   Edit, 
   Trash, 
@@ -31,8 +32,37 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarEvent, ContactWithTags } from "@shared/schema";
+import { CalendarEventWithContacts, ContactWithTags } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// Fix the typing issues
+// Add this type near the top with the other imports
+type ContactTag = {
+  id: number;
+  name: string;
+  userId: number;
+  createdAt: Date | null;
+};
+
+type Contact = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  tags?: ContactTag[];
+};
+
+// Update the CalendarEventWithContacts type to include contacts
+type EventWithContacts = CalendarEventWithContacts & {
+  contacts: Contact[];
+};
 
 export default function EventDetailPage() {
   const [, params] = useRoute('/events/:id');
@@ -41,11 +71,12 @@ export default function EventDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [markAttendedDialogOpen, setMarkAttendedDialogOpen] = useState(false);
   const [resetReminder, setResetReminder] = useState(true);
+  const [selectedContactId, setSelectedContactId] = useState<number | null>(null);
   
   const eventId = params?.id ? parseInt(params.id) : -1;
 
   // Fetch event details with proper configuration
-  const { data: event, isLoading: eventLoading, error: eventError } = useQuery<CalendarEvent>({
+  const { data: event, isLoading: eventLoading, error: eventError } = useQuery<EventWithContacts>({
     queryKey: ['/api/events', eventId],
     enabled: eventId > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -53,14 +84,12 @@ export default function EventDetailPage() {
     refetchOnMount: true,
   });
 
-  // Fetch contact details for this event only when event data is available
-  const { data: contact, isLoading: contactLoading } = useQuery<ContactWithTags>({
-    queryKey: ['/api/contacts', event?.contactId],
-    enabled: !!event?.contactId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
-  });
+  // Set the first contact as the selected contact for the "Mark as Attended" dialog
+  useEffect(() => {
+    if (event?.contacts?.length) {
+      setSelectedContactId(event.contacts[0].id);
+    }
+  }, [event]);
 
   // Delete event mutation
   const deleteEventMutation = useMutation({
@@ -96,7 +125,7 @@ export default function EventDetailPage() {
   // Mark event as attended mutation
   const markAttendedMutation = useMutation({
     mutationFn: async () => {
-      if (!event || !contact) {
+      if (!event || !selectedContactId) {
         throw new Error("Event or contact data not available");
       }
       
@@ -107,11 +136,14 @@ export default function EventDetailPage() {
         resetReminder: resetReminder,
       };
       
-      const res = await apiRequest("POST", `/api/contacts/${contact.id}/logs`, contactLogData);
+      const res = await apiRequest("POST", `/api/contacts/${selectedContactId}/logs`, contactLogData);
       return await res.json();
     },
     onSuccess: () => {
-      if (!contact) return;
+      if (!selectedContactId || !event?.contacts) return;
+      
+      // Find the selected contact
+      const selectedContact = event.contacts.find(c => c.id === selectedContactId);
       
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -119,8 +151,8 @@ export default function EventDetailPage() {
       toast({
         title: "Event marked as attended",
         description: resetReminder 
-          ? `Contact with ${contact.firstName} has been logged and reminder has been reset.`
-          : `Contact with ${contact.firstName} has been logged without changing the reminder schedule.`,
+          ? `Contact with ${selectedContact?.firstName} has been logged and reminder has been reset.`
+          : `Contact with ${selectedContact?.firstName} has been logged without changing the reminder schedule.`,
       });
       
       setMarkAttendedDialogOpen(false);
@@ -139,7 +171,7 @@ export default function EventDetailPage() {
   };
 
   // Loading state
-  if (eventLoading || contactLoading) {
+  if (eventLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -261,6 +293,9 @@ export default function EventDetailPage() {
     statusText = "Past";
   }
 
+  // Check if the event has any contacts
+  const hasContacts = event.contacts && event.contacts.length > 0;
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -332,43 +367,52 @@ export default function EventDetailPage() {
                   </div>
                 )}
 
-                {event.contactId && (
+                {hasContacts && (
                   <div className="flex items-start space-x-4">
-                    <User className="h-5 w-5 text-gray-500 mt-0.5" />
+                    {event.contacts.length === 1 ? (
+                      <User className="h-5 w-5 text-gray-500 mt-0.5" />
+                    ) : (
+                      <Users className="h-5 w-5 text-gray-500 mt-0.5" />
+                    )}
                     <div>
-                      <h3 className="font-medium">Contact</h3>
-                      {contactLoading ? (
-                        <div className="flex items-center mt-1">
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          <p className="text-gray-500">Loading contact...</p>
-                        </div>
-                      ) : contact ? (
-                        <>
-                          <p className="text-gray-700">
-                            <span
-                              className="text-primary hover:underline cursor-pointer"
-                              onClick={() => navigate(`/contacts?id=${contact.id}`)}
-                            >
-                              {`${contact.firstName} ${contact.lastName}`}
-                            </span>
-                          </p>
+                      <h3 className="font-medium">
+                        {event.contacts.length === 1 ? "Contact" : "Contacts"}
+                      </h3>
+                      <div className="space-y-2">
+                        {event.contacts.map(contact => {
+                          // Simply don't render the tags section if the typing doesn't match
+                          // This ensures the code compiles without errors
+                          const hasTagsProperty = 'tags' in contact && 
+                            Array.isArray(contact.tags) && 
+                            contact.tags.length > 0;
                           
-                          {contact.tags && contact.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {contact.tags.map(tag => (
-                                <span 
-                                  key={tag.id} 
-                                  className="px-2 py-1 rounded-full bg-gray-100 text-gray-800 text-xs"
+                          return (
+                            <div key={contact.id} className="mt-1">
+                              <p className="text-gray-700">
+                                <span
+                                  className="text-primary hover:underline cursor-pointer"
+                                  onClick={() => navigate(`/contacts?id=${contact.id}`)}
                                 >
-                                  {tag.name}
+                                  {`${contact.firstName} ${contact.lastName}`}
                                 </span>
-                              ))}
+                              </p>
+                              
+                              {hasTagsProperty && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {(contact as any).tags.map((tag: any) => (
+                                    <span 
+                                      key={tag.id} 
+                                      className="px-2 py-1 rounded-full bg-gray-100 text-gray-800 text-xs"
+                                    >
+                                      {tag.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-gray-500">Contact not found</p>
-                      )}
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -400,7 +444,7 @@ export default function EventDetailPage() {
               </div>
               
               {/* Mark as Attended Action */}
-              {(isUpcoming || isInProgress) && contact && (
+              {(isUpcoming || isInProgress) && hasContacts && (
                 <div className="mt-8 pt-6 border-t border-gray-200">
                   <Button 
                     onClick={() => setMarkAttendedDialogOpen(true)}
@@ -447,39 +491,64 @@ export default function EventDetailPage() {
       </Dialog>
       
       {/* Mark as Attended dialog */}
-      {contact && event && (
+      {hasContacts && event && (
         <Dialog open={markAttendedDialogOpen} onOpenChange={setMarkAttendedDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Mark Event as Attended</DialogTitle>
               <DialogDescription>
-                Record that you attended "{event.title}" with {contact.firstName} {contact.lastName}.
+                Record that you attended "{event.title}".
               </DialogDescription>
             </DialogHeader>
             
             <div className="py-4 space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="reset-reminder"
-                  checked={resetReminder}
-                  onCheckedChange={setResetReminder}
-                />
-                <Label htmlFor="reset-reminder" className="text-sm">
-                  Reset the reminder for {contact.firstName} (will be set to {format(startDate, "MMMM d, yyyy")})
-                </Label>
-              </div>
+              {event.contacts.length > 1 && (
+                <div className="flex flex-col gap-2">
+                  <Label>Select a contact for this attendance record:</Label>
+                  <Select
+                    onValueChange={(value) => setSelectedContactId(parseInt(value))}
+                    value={selectedContactId?.toString()}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a contact" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {event.contacts.map(contact => (
+                        <SelectItem key={contact.id} value={contact.id.toString()}>
+                          {contact.firstName} {contact.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               
-              <div className="text-sm text-gray-500">
-                {resetReminder ? (
-                  <p>
-                    The next contact reminder for {contact.firstName} will be reset to {contact.reminderFrequency} {contact.reminderFrequency === 1 ? 'month' : 'months'} from today.
-                  </p>
-                ) : (
-                  <p>
-                    The existing contact reminder for {contact.firstName} will remain unchanged.
-                  </p>
-                )}
-              </div>
+              {selectedContactId && (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="reset-reminder"
+                      checked={resetReminder}
+                      onCheckedChange={setResetReminder}
+                    />
+                    <Label htmlFor="reset-reminder" className="text-sm">
+                      Reset the reminder for {event.contacts.find(c => c.id === selectedContactId)?.firstName}
+                    </Label>
+                  </div>
+                  
+                  <div className="text-sm text-gray-500">
+                    {resetReminder ? (
+                      <p>
+                        The next contact reminder will be reset to the contact's reminder frequency from today.
+                      </p>
+                    ) : (
+                      <p>
+                        The existing contact reminder will remain unchanged.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             
             <DialogFooter>
@@ -492,6 +561,7 @@ export default function EventDetailPage() {
               <Button 
                 onClick={markEventAttended}
                 className="bg-green-600 hover:bg-green-700"
+                disabled={!selectedContactId}
               >
                 Confirm Attendance
               </Button>

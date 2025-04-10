@@ -56,7 +56,6 @@ export const contactLogs = pgTable("contact_logs", {
 export const calendarEvents = pgTable("calendar_events", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
-  contactId: integer("contact_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
   startDate: timestamp("start_date").notNull(),
@@ -67,6 +66,14 @@ export const calendarEvents = pgTable("calendar_events", {
   externalEventId: text("external_event_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// New junction table for event-contact many-to-many relationship
+export const eventContacts = pgTable("event_contacts", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull(),
+  contactId: integer("contact_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Insert Schemas
@@ -115,6 +122,10 @@ export const insertContactLogSchema = createInsertSchema(contactLogs).omit({
   resetReminder: z.boolean().optional(),
 });
 
+// New schema for event contacts
+export const insertEventContactSchema = createInsertSchema(eventContacts)
+  .omit({ id: true, createdAt: true });
+
 // Response types for API
 export type ContactWithTags = {
   id: number;
@@ -156,6 +167,8 @@ export const insertCalendarEventSchema = createInsertSchema(calendarEvents)
       }
       return val;
     }),
+    // Add contactIds array to handle multiple contacts
+    contactIds: z.array(z.number()).min(1),
   });
 
 // Type definitions
@@ -171,3 +184,10 @@ export type ContactLog = typeof contactLogs.$inferSelect;
 export type InsertContactLog = z.infer<typeof insertContactLogSchema>;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
+export type EventContact = typeof eventContacts.$inferSelect;
+export type InsertEventContact = z.infer<typeof insertEventContactSchema>;
+
+// Type for calendar event with hydrated contacts
+export type CalendarEventWithContacts = CalendarEvent & {
+  contacts: Contact[];
+};

@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Loader2, AlertCircle, Calendar, PlusCircle, Clock, MapPin } from "lucide-react";
+import { Loader2, AlertCircle, Calendar, PlusCircle, Clock, MapPin, User, Users } from "lucide-react";
 import Navbar from "@/components/navbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarEvent, ContactWithTags } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
+import { CalendarEventWithContacts } from "@shared/schema";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-type EventsData = CalendarEvent[];
+type EventsData = CalendarEventWithContacts[];
 
 export default function EventsPage() {
   const [, navigate] = useLocation();
@@ -123,6 +125,9 @@ export default function EventsPage() {
                   // Calculate if it's upcoming or in progress
                   const isInProgress = now >= eventDate && now <= endDate;
                   
+                  // Check if the event has contacts
+                  const hasContacts = event.contacts && event.contacts.length > 0;
+                  
                   return (
                     <li key={event.id}>
                       <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
@@ -153,6 +158,45 @@ export default function EventsPage() {
                                 <div className="text-sm text-gray-500 flex items-center mt-1">
                                   <MapPin className="h-4 w-4 mr-1" />
                                   {event.location}
+                                </div>
+                              )}
+                              {hasContacts && (
+                                <div className="text-sm text-gray-500 flex items-center mt-1">
+                                  {event.contacts.length === 1 ? (
+                                    <User className="h-4 w-4 mr-1" />
+                                  ) : (
+                                    <Users className="h-4 w-4 mr-1" />
+                                  )}
+                                  <div className="flex flex-wrap gap-1 items-center">
+                                    <span className="mr-1">With:</span>
+                                    {event.contacts.length <= 2 ? (
+                                      // Show all contacts if 2 or fewer
+                                      event.contacts.map((contact, index) => (
+                                        <span key={contact.id}>
+                                          {index > 0 && ", "}
+                                          {`${contact.firstName} ${contact.lastName}`}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      // Show first contact + count of others
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span>
+                                              {`${event.contacts[0].firstName} ${event.contacts[0].lastName} +${event.contacts.length - 1} more`}
+                                            </span>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <div className="space-y-1">
+                                              {event.contacts.slice(1).map(contact => (
+                                                <p key={contact.id}>{`${contact.firstName} ${contact.lastName}`}</p>
+                                              ))}
+                                            </div>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )}
+                                  </div>
                                 </div>
                               )}
                               {event.description && (
